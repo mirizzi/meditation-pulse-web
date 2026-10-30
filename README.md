@@ -20,8 +20,12 @@ si apre come un'app, anche senza connessione.
 
 ## Come si usa
 
-Premi **Meditate**. In **Options** scegli la tecnica di respiro, la modalità (per esempio
-*Guardian*, con il guardiano nel naso) e i suoni: musica, canto, suono del respiro, voce.
+Prima scegli il **ritmo del respiro**, nel riquadro in alto: è la cosa più importante, perché
+decide come si muovono il cuore, la musica e le immagini. Sotto c'è scritto a cosa serve ognuno; se
+non sai quale, inizia da *Coherent* (5,5 respiri al minuto).
+
+Poi premi **Meditate**. In **Options** scegli la modalità (per esempio *Guardian*, con il guardiano
+nel naso) e i suoni: musica, canto, suono del respiro, voce.
 
 Con la tastiera: 1–8 modalità · O opzioni · L aspetto (cinematografico, macchina a vapore,
 illustrato) · K guardiano · M musica · B respiro · Esc esci.

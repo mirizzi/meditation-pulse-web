@@ -121,8 +121,12 @@
   #panel label.range { justify-content: space-between; }
   #panel label.range input, #panel label.range select { width: 55%; }
   #panel input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--breath); }
-  #techSlot { display: flex; flex-wrap: wrap; gap: 6px; }
-  #techSlot:empty::after { content: "Choose it below the chart."; color: var(--muted); }
+  #rhythm { background: var(--panel); border: 1px solid var(--breath); border-radius: 10px; padding: 12px 14px; margin-top: 16px; }
+  #rhythm .rlabel { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  #rhythm .rlabel b { color: var(--breath); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .trow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #tech { font-size: 16px; }
+  #techInfo { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
   #panelStart { width: 100%; margin-top: 18px; }
   body.zen #panelStart { display: none; }
   .hint { color: var(--muted); font-size: 12px; margin-top: 16px; }
@@ -138,10 +142,10 @@
 </div>
 <div id="panel">
   <div class="phead"><b>Meditation options</b><button id="panelClose" title="Close (Esc)">✕</button></div>
+  <h3>Breathing rhythm · it sets how your heart, the music and the pictures move</h3>
+  <div id="techSlot"></div>
   <h3>Mode</h3>
   <div id="modes"></div>
-  <h3>Breathing</h3>
-  <div id="techSlot"></div>
   <h3>Show</h3>
   <label><input type="checkbox" data-opt="circle"> Breathing circle</label>
   <label><input type="checkbox" data-opt="words"> Phase words</label>
@@ -208,6 +212,33 @@
     </div>
   </header>
 
+  <section id="rhythm">
+    <div class="rlabel"><b>Breathing rhythm</b> · the heart of the practice: it sets how your heart, the music
+      and the pictures move</div>
+    <div id="techBox">
+      <div class="trow">
+        <select id="tech">
+          <option value="off">No breathing guide</option>
+          <option value="box">Box · 4-4-4-4</option>
+          <option value="relax">Relax · 4-7-8</option>
+          <option value="coherent">Coherent · 5.5-0-5.5-0</option>
+          <option value="exhale">Long exhale · 4-0-6-0</option>
+          <option value="triangle">Triangle · 4-4-4-0</option>
+          <option value="deep">Deep calm · 4-4-8-2</option>
+          <option value="adaptive">Find my rhythm · learns your best pace</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <span id="custom">
+          In <input type="number" min="0" max="30" step="0.5" value="4" data-i="0">
+          Hold <input type="number" min="0" max="30" step="0.5" value="4" data-i="1">
+          Out <input type="number" min="0" max="30" step="0.5" value="4" data-i="2">
+          Hold <input type="number" min="0" max="30" step="0.5" value="4" data-i="3">
+        </span>
+      </div>
+      <p id="techInfo"></p>
+    </div>
+  </section>
+
   <div class="hero">
     <div class="pulse">
       <div id="bpm">--</div>
@@ -259,23 +290,6 @@
     <button class="primary" id="startBtn">Start session</button>
     <button id="resetBtn">Reset</button>
     <button id="saveBtn" disabled title="Save this session's pulse and breathing as a CSV file">Download session</button>
-    <select id="tech">
-      <option value="off">No breathing guide</option>
-      <option value="box">Box · 4-4-4-4</option>
-      <option value="relax">Relax · 4-7-8</option>
-      <option value="coherent">Coherent · 5.5-0-5.5-0</option>
-      <option value="exhale">Long exhale · 4-0-6-0</option>
-      <option value="triangle">Triangle · 4-4-4-0</option>
-      <option value="deep">Deep calm · 4-4-8-2</option>
-      <option value="adaptive">Find my rhythm · learns your best pace</option>
-      <option value="custom">Custom…</option>
-    </select>
-    <span id="custom">
-      In <input type="number" min="0" max="30" step="0.5" value="4" data-i="0">
-      Hold <input type="number" min="0" max="30" step="0.5" value="4" data-i="1">
-      Out <input type="number" min="0" max="30" step="0.5" value="4" data-i="2">
-      Hold <input type="number" min="0" max="30" step="0.5" value="4" data-i="3">
-    </span>
     <select id="win">
       <option value="60">Last 1 min</option>
       <option value="180" selected>Last 3 min</option>
@@ -306,6 +320,23 @@ const TECH = {
   exhale: [4, 0, 6, 0], triangle: [4, 4, 4, 0], deep: [4, 4, 8, 2],
 };
 const PHASES = ["in", "hold_in", "out", "hold_out"];
+// what each rhythm is for, shown under the choice
+const TECH_INFO = {
+  off: "No guide: breathe freely. The music, sounds and pictures can't follow your breath.",
+  box: "Even and steady: calms and focuses, also under stress.",
+  relax: "A long hold and a slow exhale: for winding down and falling asleep.",
+  coherent: "The pace where heart and breath move together best for most people (resonance breathing). A good place to start.",
+  exhale: "Breathing out longer than in slows the heart and settles the body.",
+  triangle: "A gentle hold at the top: alert and calm.",
+  deep: "Slow and deep, with pauses: for a long relaxation.",
+  adaptive: "Tries paces from 4.5 to 7 breaths a minute, three minutes each, and learns which one syncs your heart best. Needs a heart rate sensor.",
+  custom: "Your own timings, in seconds: in, hold, out, hold.",
+};
+function showTechInfo() {
+  const n = $("tech").value, d = n === "custom" ? customDurations() : TECH[n], sum = d ? d.reduce((a, b) => a + b, 0) : 0;
+  $("custom").className = n === "custom" ? "show" : "";
+  $("techInfo").textContent = (sum > 0 ? `${+(60 / sum).toFixed(1)} breaths a minute · ` : "") + TECH_INFO[n];
+}
 
 let guide = null;        // {name, d: [4 durations], start}
 let lastPhaseKey = null;
@@ -756,9 +787,8 @@ document.querySelectorAll("[data-opt]").forEach(el => el.oninput = () => {
 });
 function setPanel(on) {
   document.body.classList.toggle("panel", on);
-  // the technique controls live in the panel while it is open or while meditating, below the chart otherwise
-  if (on || zen) $("techSlot").append($("tech"), $("custom"));
-  else $("win").before($("tech"), $("custom"));
+  // the rhythm controls live in the panel while it is open or while meditating, at the top otherwise
+  (on || zen ? $("techSlot") : $("rhythm")).append($("techBox"));
 }
 $("optBtn").onclick = () => setPanel(true);
 $("zenOpt").onclick = () => setPanel(!document.body.classList.contains("panel"));
@@ -768,8 +798,9 @@ $("panelStart").onclick = () => setZen(true);
 // the breathing technique is remembered too
 $("tech").value = opt.tech;
 document.querySelectorAll("#custom input").forEach((i, n) => i.value = opt.custom[n]);
-$("tech").addEventListener("change", e => setOpt({ tech: e.target.value }));
-document.querySelectorAll("#custom input").forEach(i => i.addEventListener("input", () => setOpt({ custom: customDurations() })));
+$("tech").addEventListener("change", e => { setOpt({ tech: e.target.value }); showTechInfo(); });
+document.querySelectorAll("#custom input").forEach(i => i.addEventListener("input", () => { setOpt({ custom: customDurations() }); showTechInfo(); }));
+showTechInfo();
 
 let zen = false;
 function setZen(on) {
