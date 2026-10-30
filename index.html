@@ -1,0 +1,3118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>window.MP_WEB = true;</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="theme-color" content="#0e1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meditation Pulse">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meditation Pulse</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --text: #e6edf3; --muted: #8b949e;
+    --accent: #e5534b; --calm: #57ab5a; --breath: #539bf5; --line: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0; }
+  #status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .top { display: flex; align-items: center; gap: 14px; }
+  .top button { padding: 5px 12px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  @media (max-width: 640px) {  /* phones: the status and buttons wrap instead of widening the page */
+    .top { flex-wrap: wrap; gap: 8px; }
+    #status { flex-basis: 100%; }
+    #bpm { font-size: 84px; }
+  }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  #dot.on { background: var(--calm); }
+
+  .hero { display: flex; justify-content: center; align-items: center; gap: 56px; padding: 28px 0 12px; flex-wrap: wrap; }
+  .pulse { text-align: center; }
+  #bpm { font-size: 112px; font-weight: 200; font-variant-numeric: tabular-nums; line-height: 1; }
+  .unit { color: var(--muted); font-size: 16px; letter-spacing: .1em; }
+  #heart { display: inline-block; color: var(--accent); font-size: 28px; transition: transform .12s; }
+  #heart.beat { transform: scale(1.35); }
+
+  #pacerWrap { width: 190px; height: 190px; position: relative; display: none; }
+  #pacerWrap.show { display: block; }
+  #pacerRing { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed var(--line); }
+  #pacer { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #539bf555, #539bf522);
+    border: 2px solid var(--breath); transform: scale(.45); }
+  #pacerText { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #phaseName { font-size: 18px; }
+  #phaseCount { font-size: 34px; font-weight: 200; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 16px 0; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .stat b { display: block; font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  #phaseStats { display: none; }
+  #phaseStats.show { display: grid; }
+  #phaseStats .stat b { color: var(--breath); }
+
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  canvas { width: 100%; height: 260px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: block; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+  button, select, input { background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 12px; font: inherit; }
+  button { cursor: pointer; }
+  button.primary { background: var(--calm); border-color: var(--calm); color: #fff; }
+  #custom { display: none; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+  #custom.show { display: flex; }
+  #custom input { width: 62px; padding: 6px 8px; }
+
+  #help { margin-top: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; color: var(--muted); display: none; }
+  #help.show { display: block; }
+  #help b { color: var(--text); }
+  #awakeBtn.on { color: var(--text); border-color: var(--calm); }
+
+  /* meditation view: each element follows its option (body.opt-*) */
+  #zenBar, #zenNote, #panel { display: none; }
+  body.zen main { max-width: 1200px; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+  body.zen header, body.zen .pulse, body.zen .stats, body.zen .legend, body.zen .controls, body.zen #help { display: none !important; }
+  body.zen #pacerWrap { width: min(300px, 40vh); height: min(300px, 40vh); }
+  body.zen:not(.opt-circle) #pacerWrap { display: none; }
+  body.zen #phaseName { font-size: 22px; color: var(--muted); }
+  body.zen:not(.opt-words) #phaseName { display: none; }
+  body.zen:not(.opt-count) #phaseCount { display: none; }
+  body.zen.opt-count:not(.opt-words) #phaseCount { font-size: 40px; }
+  body.zen #chart { height: 38vh; background: transparent; border-color: transparent; }
+  body.zen:not(.opt-chart) #chart { display: none; }
+  #nose { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1;
+    background: #0b1621; border: 0; border-radius: 0; }
+  body.zen.opt-nose:not(.look3d):not(.lookM) #nose { display: block; }
+  #nose3d { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; background: #000; }
+  body.zen.opt-nose.look3d #nose3d { display: block; }
+  #noseM { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; background: #000; }
+  body.zen.opt-nose.lookM #noseM { display: block; }
+  body.zen.opt-dark::after { content: ""; position: fixed; inset: 0; background: #000; opacity: var(--darkness, .9); pointer-events: none; }
+  body.zen #zenBar { display: flex; gap: 8px; align-items: center; position: fixed; top: 14px; right: 16px; z-index: 2;
+    opacity: .35; transition: opacity .6s; }
+  body.zen #zenBar:hover { opacity: 1; }
+  #modeName { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  body.zen.opt-fade.idle:not(.panel) #zenBar { opacity: 0; }
+  body.zen.opt-fade.idle:not(.panel) { cursor: none; }
+  body.zen #zenNote.show { display: block; text-align: center; color: var(--muted); font-size: 13px; margin-top: 12px; }
+  body.zen:not(.opt-words) #zenNote.show { font-size: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+    opacity: .5; margin: 14px auto 0; }
+
+  /* options panel */
+  body.panel #panel { display: block; position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 100vw); z-index: 3;
+    overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 16px; font-size: 14px; }
+  .phead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .phead b { font-size: 16px; }
+  #panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+  #modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  #modes button { text-align: left; padding: 8px 10px; }
+  #modes button span { display: block; color: var(--muted); font-size: 12px; }
+  #modes button.on { border-color: var(--breath); }
+  #panel label { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  #panel label.range { justify-content: space-between; }
+  #panel label.range input, #panel label.range select { width: 55%; }
+  #panel input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--breath); }
+  #techSlot { display: flex; flex-wrap: wrap; gap: 6px; }
+  #techSlot:empty::after { content: "Choose it below the chart."; color: var(--muted); }
+  #panelStart { width: 100%; margin-top: 18px; }
+  body.zen #panelStart { display: none; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<canvas id="nose"></canvas>
+<canvas id="nose3d"></canvas><canvas id="noseM"></canvas>
+<div id="zenBar">
+  <span id="modeName"></span>
+  <button id="zenOpt" title="Modes and options (O)">Options</button>
+  <button id="zenExit" title="Back to the dashboard (Esc)">Exit</button>
+</div>
+<div id="panel">
+  <div class="phead"><b>Meditation options</b><button id="panelClose" title="Close (Esc)">✕</button></div>
+  <h3>Mode</h3>
+  <div id="modes"></div>
+  <h3>Breathing</h3>
+  <div id="techSlot"></div>
+  <h3>Show</h3>
+  <label><input type="checkbox" data-opt="circle"> Breathing circle</label>
+  <label><input type="checkbox" data-opt="words"> Phase words</label>
+  <label><input type="checkbox" data-opt="count"> Seconds</label>
+  <label><input type="checkbox" data-opt="nose"> Nose guardian: a little worker in your nostril, air and dust
+    moving with your breath</label>
+  <label class="range">Look <select data-opt="noseLook"><option value="cinematic">Cinematic 3D</option>
+    <option value="machine">Steam machine 3D: a cathedral of iron, dust and steam</option>
+    <option value="illustrated">Illustrated</option></select></label>
+  <label class="range">3D guardian <select data-opt="guard3d"><option value="mite">Demodex mite</option>
+    <option value="knight">Medieval knight with a standard</option>
+    <option value="soldier">Soldier (3D model)</option><option value="mannequin">Mannequin (3D model)</option>
+    <option value="none">Nobody</option></select></label>
+  <label class="range">Illustrated guardian <select data-opt="guardStyle"><option value="worker">Worker with a net</option>
+    <option value="soldier">Medieval soldier</option><option value="microbe">Strange microbe</option>
+    <option value="ant">Ant with a leaf</option></select></label>
+  <label class="range">Illustrated view <select data-opt="noseView"><option value="section">Cutaway, from the side</option>
+    <option value="inside">From inside, looking out</option></select></label>
+  <label><input type="checkbox" data-opt="chart"> Pulse and breath chart</label>
+  <label><input type="checkbox" data-opt="ticks"> Numbers on the chart's Y axis</label>
+  <label><input type="checkbox" data-opt="dark"> Dark screen</label>
+  <label class="range">Darkness <input type="range" min="0.3" max="1" step="0.05" data-opt="darkness"></label>
+  <label><input type="checkbox" data-opt="glow"> Circle glows when your heart follows your breath</label>
+  <label><input type="checkbox" data-opt="fade"> Hide the buttons while the mouse is still</label>
+  <h3>Music</h3>
+  <label><input type="checkbox" data-opt="music"> Music</label>
+  <label class="range">Follow the breath <input type="range" min="0" max="1" step="0.05" data-opt="follow"
+    title="Left: free music that flows on its own. Right: music that marks every phase."></label>
+  <label class="range">Human touch <input type="range" min="0" max="1" step="0.05" data-opt="human"
+    title="Looser timing and loudness, a note left out now and then"></label>
+  <label class="range">Your instrument <input type="range" min="0" max="1" step="0.05" data-opt="inst"></label>
+  <label class="range">Singing bowls <input type="range" min="0" max="1" step="0.05" data-opt="bowls"></label>
+  <label class="range">Tanpura <input type="range" min="0" max="1" step="0.05" data-opt="tanpura"></label>
+  <label class="range">Synth pad <input type="range" min="0" max="1" step="0.05" data-opt="pad"></label>
+  <h3>Chant</h3>
+  <label><input type="checkbox" data-opt="chant"> Sung syllables</label>
+  <label class="range">Syllables <select data-opt="chantStyle">
+    <option value="soham">So – Ham</option><option value="om">Om (A–U–M)</option><option value="aah">Aah</option></select></label>
+  <label class="range">Volume <input type="range" min="0" max="1" step="0.05" data-opt="chantVol"></label>
+  <h3>Breath sound</h3>
+  <label><input type="checkbox" data-opt="breath"> Breathing sound</label>
+  <label class="range">Volume <input type="range" min="0" max="1" step="0.05" data-opt="breathVol"></label>
+  <h3>Spoken voice</h3>
+  <label><input type="checkbox" data-opt="voice"> Say each phase</label>
+  <label class="range">Language <select data-opt="lang"><option value="en">English</option><option value="it">Italiano</option></select></label>
+  <label class="range">Speed <input type="range" min="0.5" max="1.2" step="0.05" data-opt="voiceRate"></label>
+  <label class="range">Volume <input type="range" min="0" max="1" step="0.05" data-opt="voiceVol"></label>
+  <h3>All sound</h3>
+  <label class="range">Volume <input type="range" min="0" max="1" step="0.05" data-opt="vol"></label>
+  <button class="primary" id="panelStart">Start meditating</button>
+  <p class="hint">Keys while meditating: 1–8 modes · C circle · N nose guardian · K next guardian ·
+    L look (cinematic, steam machine, illustrated) · I cutaway/inside (illustrated) · W words · S seconds · G chart ·
+    Y chart numbers · M music · H chant · B breath · V voice · D dark · O options · Esc exit</p>
+</div>
+<main>
+  <header>
+    <h1>Meditation Pulse</h1>
+    <div class="top">
+      <div id="status"><div id="dot"></div><span id="statusText">Connecting…</span></div>
+      <button id="zenBtn" title="Meditate in the mode chosen in Options">Meditate</button>
+      <button id="optBtn" title="Meditation modes and options">Options</button>
+      <button id="awakeBtn" title="Stop the screen from dimming or sleeping, also on battery">Keep screen on</button>
+      <button id="stopBtn" title="Stop the monitor and release the watch">Stop monitor</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="pulse">
+      <div id="bpm">--</div>
+      <div class="unit"><span id="heart">♥</span>&nbsp; BPM</div>
+    </div>
+    <div id="pacerWrap">
+      <div id="pacerRing"></div>
+      <div id="pacer"></div>
+      <div id="pacerText"><div id="phaseName">Inhale</div><div id="phaseCount">4</div></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span>Session</span><b id="sTime">0:00</b></div>
+    <div class="stat"><span>Start</span><b id="sStart">--</b></div>
+    <div class="stat"><span>Average</span><b id="sAvg">--</b></div>
+    <div class="stat"><span>Lowest</span><b id="sMin">--</b></div>
+    <div class="stat"><span>Highest</span><b id="sMax">--</b></div>
+    <div class="stat"><span>Change</span><b id="sDelta">--</b></div>
+    <div class="stat" id="hrvBox" style="display:none"><span>HRV (RMSSD)</span><b id="sHrv">--</b></div>
+  </div>
+
+  <div class="stats" id="syncStats">
+    <div class="stat" title="How much of your pulse rhythm moves with your breath (last 2 minutes), 0–100">
+      <span>Heart–breath sync</span><b id="sSync">--</b></div>
+    <div class="stat" title="How much your pulse rises on the inhale and falls on the exhale">
+      <span>Pulse swing · bpm</span><b id="sRsa">--</b></div>
+    <div class="stat" title="Correlation of pulse with breath, and how many seconds the pulse lags">
+      <span>Coupling · lag</span><b id="sCouple">--</b></div>
+    <div class="stat" title="Find my rhythm: rate being tried, time in this trial, best rate so far">
+      <span>Rhythm</span><b id="sRhythm" style="font-size:16px">--</b></div>
+  </div>
+
+  <div class="stats" id="phaseStats">
+    <div class="stat"><span>Pulse · inhale</span><b id="p_in">--</b></div>
+    <div class="stat"><span>Pulse · hold full</span><b id="p_hold_in">--</b></div>
+    <div class="stat"><span>Pulse · exhale</span><b id="p_out">--</b></div>
+    <div class="stat"><span>Pulse · hold empty</span><b id="p_hold_out">--</b></div>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:var(--accent)"></i>Pulse (left axis)</span>
+    <span><i style="background:var(--breath)"></i>Breathing guide (right axis)</span>
+  </div>
+  <canvas id="chart"></canvas>
+  <div id="zenNote"></div>
+
+  <div class="controls">
+    <button class="primary" id="startBtn">Start session</button>
+    <button id="resetBtn">Reset</button>
+    <select id="tech">
+      <option value="off">No breathing guide</option>
+      <option value="box">Box · 4-4-4-4</option>
+      <option value="relax">Relax · 4-7-8</option>
+      <option value="coherent">Coherent · 5.5-0-5.5-0</option>
+      <option value="exhale">Long exhale · 4-0-6-0</option>
+      <option value="triangle">Triangle · 4-4-4-0</option>
+      <option value="deep">Deep calm · 4-4-8-2</option>
+      <option value="adaptive">Find my rhythm · learns your best pace</option>
+      <option value="custom">Custom…</option>
+    </select>
+    <span id="custom">
+      In <input type="number" min="0" max="30" step="0.5" value="4" data-i="0">
+      Hold <input type="number" min="0" max="30" step="0.5" value="4" data-i="1">
+      Out <input type="number" min="0" max="30" step="0.5" value="4" data-i="2">
+      Hold <input type="number" min="0" max="30" step="0.5" value="4" data-i="3">
+    </span>
+    <select id="win">
+      <option value="60">Last 1 min</option>
+      <option value="180" selected>Last 3 min</option>
+      <option value="600">Last 10 min</option>
+    </select>
+  </div>
+
+  <div id="help">
+    <b>No pulse from the watch.</b> On your Venu 3S, turn on heart-rate broadcast:
+    hold the <b>bottom button (B)</b> → <b>Settings</b> → <b>Watch Sensors</b> →
+    <b>Wrist Heart Rate</b> → <b>Broadcast Heart Rate</b>, then press the <b>top button (A)</b> to start. Or hold the <b>top button (A)</b> and tap the
+    <b>Broadcast Heart Rate</b> control. Keep the watch near the Mac; it will connect automatically.
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js" crossorigin="anonymous"></script>
+<script>
+const $ = id => document.getElementById(id);
+// The same page runs two ways: served by hr_monitor.py on this Mac, or as the web app for friends
+// (web/build.sh sets MP_WEB), where the pulse comes over Web Bluetooth and everything stays in the browser.
+const WEB = !!window.MP_WEB;
+const now = () => Date.now() / 1000;
+
+// ---- breathing techniques: [inhale, hold full, exhale, hold empty] in seconds
+const TECH = {
+  box: [4, 4, 4, 4], relax: [4, 7, 8, 0], coherent: [5.5, 0, 5.5, 0],
+  exhale: [4, 0, 6, 0], triangle: [4, 4, 4, 0], deep: [4, 4, 8, 2],
+};
+const PHASES = ["in", "hold_in", "out", "hold_out"];
+
+let guide = null;        // {name, d: [4 durations], start}
+let lastPhaseKey = null;
+
+function customDurations() {
+  return [...document.querySelectorAll("#custom input")].map(i => Math.max(0, +i.value || 0));
+}
+
+function setGuide(name) {
+  const d = name === "custom" ? customDurations() : name === "adaptive" ? startTrial() : TECH[name];
+  $("custom").className = name === "custom" ? "show" : "";
+  if (name === "off" || !d || d.reduce((a, b) => a + b, 0) <= 0) {
+    guide = null; $("pacerWrap").className = ""; postBreath(null); lastPhaseKey = null;
+    return;
+  }
+  // start a fresh cycle now, so a change mid-session takes effect immediately
+  guide = { name, d, start: now() };
+  lastPhaseKey = null;
+  $("pacerWrap").className = "show";
+}
+
+function breathAt(t) {
+  const total = guide.d.reduce((a, b) => a + b, 0);
+  const cycle = Math.floor((t - guide.start) / total);
+  let e = (t - guide.start) - cycle * total;
+  const last = guide.d.findLastIndex(dur => dur > 0);
+  for (let i = 0; i < 4; i++) {
+    const dur = guide.d[i];
+    if (dur <= 0) continue;
+    if (e < dur || i === last) {
+      const p = Math.min(e / dur, 1), ease = (1 - Math.cos(Math.PI * p)) / 2;
+      const level = [ease, 1, 1 - ease, 0][i];
+      return { phase: PHASES[i], level, remaining: dur - e, dur, phaseStart: t - e, key: `${cycle}:${i}` };
+    }
+    e -= dur;
+  }
+}
+
+function postBreath(b) {
+  if (WEB) return;
+  fetch("/breath", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(b ? { technique: TECH[guide.name] ? guide.name : `${guide.name} ${guide.d.join("-")}`,
+                               phase: b.phase, start: b.phaseStart, dur: b.dur } : {}) }).catch(() => {});
+}
+
+// ---- data
+const hr = [];           // {t, bpm}
+const breath = [];       // {t, level}, gaps when the guide is off
+let session = null;      // {start, readings, rr, byPhase}
+
+function fmtTime(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+
+function setStatus(st, dev) {
+  $("dot").className = st === "connected" ? "on" : "";
+  $("statusText").textContent = {
+    connected: `Connected · ${dev}`, scanning: "Searching for watch…", connecting: `Connecting to ${dev}…`,
+    not_found: "Watch not found — turn on HR broadcast", no_data: `${dev} connected but sending no pulse — turn on Broadcast Heart Rate`, disconnected: "Disconnected — reconnecting…",
+    starting: "Starting…", web: "Breathing guide ready · connect a heart rate sensor if you have one",
+    web_nobt: "Heart rate needs Chrome or Edge on Android, Windows or Mac; the breathing guide works everywhere",
+    web_error: "Couldn't connect to the heart rate sensor — try again",
+  }[st] || st;
+  $("help").className = st === "not_found" || st === "no_data" ? "show" : "";
+  $("zenNote").textContent = $("statusText").textContent;
+  $("zenNote").className = st === "connected" || /^web/.test(st) ? "" : "show";
+}
+
+function onHr(m) {
+  hr.push({ t: m.t, bpm: m.bpm });
+  while (hr.length && hr[0].t < m.t - 3600) hr.shift();
+  $("bpm").textContent = m.bpm;
+  $("heart").classList.add("beat"); setTimeout(() => $("heart").classList.remove("beat"), 150);
+  if (session) {
+    session.readings.push(m.bpm);
+    session.rr.push(...m.rr);
+    if (guide) session.byPhase[breathAt(m.t).phase].push(m.bpm);
+  }
+  updateStats();
+}
+
+function updateStats() {
+  if (!session || !session.readings.length) return;
+  const r = session.readings, startAvg = avg(r.slice(0, 10)), cur = avg(r.slice(-10));
+  $("sStart").textContent = Math.round(startAvg);
+  $("sAvg").textContent = Math.round(avg(r));
+  $("sMin").textContent = Math.min(...r);
+  $("sMax").textContent = Math.max(...r);
+  const d = Math.round(cur - startAvg);
+  $("sDelta").textContent = (d > 0 ? "+" : "") + d;
+  $("sDelta").style.color = d < 0 ? "var(--calm)" : d > 0 ? "var(--accent)" : "";
+  const rr = session.rr.slice(-120);
+  if (rr.length > 10) {
+    let sum = 0;
+    for (let i = 1; i < rr.length; i++) sum += (rr[i] - rr[i - 1]) ** 2;
+    $("hrvBox").style.display = "";
+    $("sHrv").textContent = Math.round(Math.sqrt(sum / (rr.length - 1))) + " ms";
+  }
+  const used = PHASES.some(p => session.byPhase[p].length);
+  $("phaseStats").className = used ? "stats show" : "stats";
+  for (const p of PHASES) {
+    const v = session.byPhase[p];
+    $("p_" + p).textContent = v.length ? avg(v).toFixed(1) : "--";
+  }
+}
+
+// ---- pacer animation + breath sampling
+// phase changes run on a timer too: animation frames stop when the window is hidden, the voice must not
+function checkPhase() {
+  if (!guide) return;
+  let b = breathAt(now());
+  if (b.key !== lastPhaseKey) {
+    if (b.phase === "in" && guide.name === "adaptive" && nextTrial()) b = breathAt(now());
+    lastPhaseKey = b.key; postBreath(b);
+    onPhase(b);
+  }
+}
+setInterval(() => { checkPhase(); updateSound(); }, 100);
+
+function animate() {
+  if (guide) {
+    const b = breathAt(now());
+    $("pacer").style.transform = `scale(${0.45 + 0.55 * b.level})`;
+    $("phaseName").textContent = phaseWord(b.phase);
+    $("phaseCount").textContent = Math.ceil(b.remaining);
+    glow();
+    checkPhase();
+  }
+  drawNose();
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+setInterval(() => {
+  const t = now();
+  breath.push(guide ? { t, level: breathAt(t).level } : { t, level: null });
+  while (breath.length && breath[0].t < t - 3600) breath.shift();
+  if (session) $("sTime").textContent = fmtTime(t - session.start);
+  draw();
+}, 200);
+
+// ---- chart: pulse on the left axis, breathing guide on the right axis
+function draw() {
+  const c = $("chart"), dpr = devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  c.width = w * dpr; c.height = h * dpr;
+  const ctx = c.getContext("2d"); ctx.scale(dpr, dpr);
+  const W = +$("win").value, t1 = now(), t0 = t1 - W;
+  const pad = { l: 38, r: 46, t: 12, b: 24 };
+  const x = t => pad.l + (t - t0) / W * (w - pad.l - pad.r);
+  const pts = hr.filter(p => p.t > t0);
+  let lo = 50, hi = 90;
+  if (pts.length) {
+    lo = Math.floor((Math.min(...pts.map(p => p.bpm)) - 4) / 5) * 5;
+    hi = Math.ceil((Math.max(...pts.map(p => p.bpm)) + 4) / 5) * 5;
+  }
+  const y = v => pad.t + (hi - v) / (hi - lo) * (h - pad.t - pad.b);
+  const yb = l => pad.t + (1 - l) * (h - pad.t - pad.b);
+
+  ctx.font = "11px -apple-system, sans-serif"; ctx.lineWidth = 1;
+  ctx.strokeStyle = "#30363d"; ctx.fillStyle = "#8b949e";
+  const step = (hi - lo) > 40 ? 10 : 5;
+  for (let v = lo; v <= hi; v += step) {
+    ctx.beginPath(); ctx.moveTo(pad.l, y(v)); ctx.lineTo(w - pad.r, y(v)); ctx.stroke();
+    if (!zen || opt.ticks) ctx.fillText(v, 8, y(v) + 4);
+  }
+  if (zen && opt.ticks) {
+    ctx.fillStyle = "#539bf5";
+    ctx.fillText("full", w - pad.r + 8, yb(1) + 4);
+    ctx.fillText("empty", w - pad.r + 8, yb(0) + 4);
+  }
+  if (!zen) {
+    const tick = { 60: 15, 180: 30, 600: 120 }[W];
+    for (let s = 0; s <= W; s += tick) ctx.fillText(s ? `-${fmtTime(s)}` : "now", x(t1 - s) - 12, h - 7);
+    ctx.fillStyle = "#539bf5";
+    ctx.fillText("full", w - pad.r + 8, yb(1) + 4);
+    ctx.fillText("empty", w - pad.r + 8, yb(0) + 4);
+  }
+
+  // breathing guide: filled area, broken where the guide was off
+  const bp = breath.filter(p => p.t > t0);
+  let run = [];
+  const flush = () => {
+    if (run.length > 1) {
+      ctx.beginPath(); ctx.moveTo(x(run[0].t), yb(0));
+      run.forEach(p => ctx.lineTo(x(p.t), yb(p.level)));
+      ctx.lineTo(x(run[run.length - 1].t), yb(0)); ctx.closePath();
+      ctx.fillStyle = "#539bf522"; ctx.fill();
+      ctx.beginPath(); run.forEach((p, i) => i ? ctx.lineTo(x(p.t), yb(p.level)) : ctx.moveTo(x(p.t), yb(p.level)));
+      ctx.strokeStyle = "#539bf5"; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    run = [];
+  };
+  for (const p of bp) p.level === null ? flush() : run.push(p);
+  flush();
+
+  if (session && session.start > t0) {
+    ctx.strokeStyle = "#57ab5a88"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x(session.start), pad.t); ctx.lineTo(x(session.start), h - pad.b); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (pts.length) {
+    ctx.strokeStyle = "#e5534b"; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(x(p.t), y(p.bpm)) : ctx.moveTo(x(p.t), y(p.bpm)));
+    ctx.stroke();
+  }
+}
+
+// ---- controls
+function clearStats() {
+  ["sStart", "sAvg", "sMin", "sMax", "sDelta", "sHrv"].forEach(id => $(id).textContent = "--");
+  PHASES.forEach(p => $("p_" + p).textContent = "--");
+  $("phaseStats").className = "stats";
+}
+$("startBtn").onclick = () => {
+  if (session) { session = null; $("startBtn").textContent = "Start session"; return; }
+  session = { start: now(), readings: [], rr: [], byPhase: { in: [], hold_in: [], out: [], hold_out: [] } };
+  $("startBtn").textContent = "Stop session";
+  clearStats();
+};
+$("resetBtn").onclick = () => {
+  session = null; hr.length = 0; breath.length = 0;
+  $("startBtn").textContent = "Start session"; $("sTime").textContent = "0:00"; clearStats();
+};
+$("tech").onchange = e => setGuide(e.target.value);
+document.querySelectorAll("#custom input").forEach(i => i.oninput = () => setGuide("custom"));
+
+// ---- heart–breath synchronization: the same three numbers as analysis/coherence.py, over the
+// last two minutes with one breathing pattern
+//   score  share of pulse variability (0.04–0.4 Hz) at the breathing frequency, 0–100
+//   rsa    pulse swing across one breath, in bpm (how much the heart speeds up on the inhale)
+//   r/lag  best correlation of pulse with lung level, and the pulse's delay behind the breath
+const SYNC_WINDOW = 120, SYNC_FS = 4;
+let sync = null;  // {score, rsa, r, lag} or {measuring: seconds left}
+
+function computeSync() {
+  if (!guide) { sync = null; return; }
+  const T = guide.d.reduce((a, b) => a + b, 0), t1 = now(), t0 = t1 - SYNC_WINDOW;
+  const since = Math.max(guide.start, hr.length ? hr[0].t : t1);
+  if (since > t0) { sync = { measuring: Math.ceil(since - t0) }; return; }
+  const pts = hr.filter(p => p.t >= t0 - 2);
+  if (pts.length < SYNC_WINDOW / 3) { sync = null; return; }  // the watch dropped out
+  const n = SYNC_WINDOW * SYNC_FS, x = new Float64Array(n), lv = new Float64Array(n);
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const t = t0 + i / SYNC_FS;
+    while (j < pts.length - 2 && pts[j + 1].t < t) j++;
+    const a = pts[j], b = pts[j + 1] || a;
+    x[i] = b.t > a.t ? a.bpm + (b.bpm - a.bpm) * Math.min(Math.max((t - a.t) / (b.t - a.t), 0), 1) : a.bpm;
+    lv[i] = breathAt(t).level;
+  }
+  // remove slow drift: subtract a 30 s moving average
+  const w = 30 * SYNC_FS / 2, cum = [0];
+  for (let i = 0; i < n; i++) cum.push(cum[i] + x[i]);
+  const h = x.map((v, i) => { const a = Math.max(0, i - w), b = Math.min(n, i + w); return v - (cum[b] - cum[a]) / (b - a); });
+  const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  const lm = mean(lv), lc = lv.map(v => v - lm);
+  const corr = (a, b) => {
+    const ma = mean(a), mb = mean(b);
+    let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < a.length; i++) { const da = a[i] - ma, db = b[i] - mb; sab += da * db; saa += da * da; sbb += db * db; }
+    return saa && sbb ? sab / Math.sqrt(saa * sbb) : 0;
+  };
+  let r = 0, lag = 0;
+  for (let k = 0; k < T * SYNC_FS; k++) {
+    const c = corr(h.slice(k), lc.slice(0, n - k));
+    if (c > r) { r = c; lag = k / SYNC_FS; }
+  }
+  const bins = Array.from({ length: 20 }, () => []);
+  h.forEach((v, i) => bins[Math.floor((((i / SYNC_FS) % T) / T) * 20)].push(v));
+  const profile = bins.filter(b => b.length).map(mean);
+  const rsa = Math.max(...profile) - Math.min(...profile);
+  // power at each frequency of the 0.04–0.4 Hz band (Hann window, direct sums)
+  let band = 0, peak = 0;
+  for (let f = .04; f <= .4; f += 1 / SYNC_WINDOW) {
+    let re = 0, im = 0;
+    for (let i = 0; i < n; i++) {
+      const wv = h[i] * (.5 - .5 * Math.cos(2 * Math.PI * i / (n - 1))), a = 2 * Math.PI * f * i / SYNC_FS;
+      re += wv * Math.cos(a); im -= wv * Math.sin(a);
+    }
+    const p = re * re + im * im;
+    band += p;
+    if (Math.abs(f - 1 / T) <= .015) peak += p;
+  }
+  sync = { score: band ? Math.round(100 * peak / band) : 0, rsa, r, lag };
+}
+
+function showSync() {
+  const m = sync && sync.measuring;
+  $("sSync").textContent = !sync ? "--" : m ? `in ${m}s` : sync.score;
+  $("sRsa").textContent = sync && !m ? `±${(sync.rsa / 2).toFixed(1)}` : "--";
+  $("sCouple").textContent = sync && !m ? `${sync.r.toFixed(2)} · ${sync.lag.toFixed(1)}s` : "--";
+  if (guide && guide.name === "adaptive" && trial) {
+    const best = bestRate();
+    $("sRhythm").textContent = `${trial.rate}/min · ${fmtTime(now() - trial.start)} of ${fmtTime(TRIAL)}` +
+      (best ? ` · best ${best}` : "");
+  } else $("sRhythm").textContent = "--";
+}
+setInterval(() => { computeSync(); showSync(); }, 5000);
+
+// glow: the breathing circle lights up as the heart follows the breath (light feedback)
+function glow() {
+  const s = opt.glow && sync && !sync.measuring ? Math.min(sync.score / 80, 1) : 0;
+  $("pacer").style.boxShadow = s ? `0 0 ${10 + 60 * s}px ${4 + 20 * s}px rgba(87,171,90,${(.15 + .55 * s).toFixed(2)})` : "";
+}
+
+// ---- Find my rhythm: a small learning loop over breathing rates (breaths per minute), looking for
+// the one that syncs this person's heart best (their resonance rate). Each trial keeps one rate for
+// three minutes; its reward is the sync score of the last two. The next rate is the best one so far
+// or a neighbour, picked by an upper confidence bound so untried and uncertain rates get a turn.
+// What it learns is kept by hr_monitor.py in sessions/learning.json (in the web app, in the browser).
+const RATES = [4.5, 5, 5.5, 6, 6.5, 7], TRIAL = 180;
+let learn = { arms: {}, history: [] }, trial = null;
+if (WEB) { try { learn = JSON.parse(localStorage.getItem("mp.learning")) || learn; } catch {} }
+else fetch("/learning").then(r => r.json()).then(j => { learn = j; }).catch(() => {});
+
+const armMean = r => learn.arms[r].sum / learn.arms[r].n;
+function bestRate() {
+  const tried = RATES.filter(r => learn.arms[r]?.n);
+  return tried.length ? tried.reduce((a, b) => armMean(b) > armMean(a) ? b : a) : null;
+}
+function pickRate() {
+  const best = bestRate();
+  if (!best) return 6;
+  const N = RATES.reduce((s, r) => s + (learn.arms[r]?.n || 0), 0), i = RATES.indexOf(best);
+  const ucb = r => learn.arms[r]?.n ? armMean(r) + .25 * Math.sqrt(Math.log(N + 1) / learn.arms[r].n) : Infinity;
+  return RATES.slice(Math.max(0, i - 1), i + 2).reduce((a, b) => ucb(b) > ucb(a) ? b : a);
+}
+function startTrial() {
+  trial = { rate: pickRate(), start: now() };
+  const c = 60 / trial.rate;  // inhale 40 %, exhale 60 % of each breath
+  return [Math.round(c * 4) / 10, 0, Math.round(c * 6) / 10, 0];
+}
+// called at the start of each inhale; returns true when a new trial (and breathing pattern) began
+function nextTrial() {
+  if (!trial || now() - trial.start < TRIAL) return false;
+  computeSync();
+  if (sync && !sync.measuring) {
+    const a = learn.arms[trial.rate] ||= { n: 0, sum: 0 };
+    a.n++; a.sum += sync.score / 100;
+    learn.history.push({ t: new Date().toISOString(), rate: trial.rate, score: sync.score,
+                         rsa: +sync.rsa.toFixed(2), r: +sync.r.toFixed(2), lag: sync.lag, bpm: hr.at(-1)?.bpm });
+    if (WEB) { try { localStorage.setItem("mp.learning", JSON.stringify(learn)); } catch {} }
+    else fetch("/learning", { method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(learn) }).catch(() => {});
+  }
+  guide = { name: "adaptive", d: startTrial(), start: now() };
+  return true;
+}
+
+// ---- meditation view: circle, words, seconds, chart, spoken voice, chant, breath sound, music and
+// dark screen can each be switched on or off, alone or in any mix; the named modes are starting points
+const PRESETS = {
+  flow:   { name: "Flow",   hint: "breathing circle and music",
+            circle: true,  nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: false, music: true,  dark: false },
+  circle: { name: "Circle", hint: "only the breathing circle, silent",
+            circle: true,  nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: false, music: false, dark: false },
+  music:  { name: "Music",  hint: "only the music, dark screen",
+            circle: false, nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: false, music: true,  dark: true },
+  mantra: { name: "Mantra", hint: "a sung So–Ham on your breath, dark screen",
+            circle: false, nose: false, words: false, count: false, chart: false, voice: false, chant: true,  breath: true,  music: false, dark: true },
+  ocean:  { name: "Ocean",  hint: "only the sound of breathing, dark screen",
+            circle: false, nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: true,  music: false, dark: true },
+  guided: { name: "Guided", hint: "circle, words, spoken voice and music",
+            circle: true,  nose: false, words: true,  count: false, chart: false, voice: true,  chant: false, breath: false, music: true,  dark: false },
+  full:   { name: "Full",   hint: "everything on, with seconds and the chart",
+            circle: true,  nose: false, words: true,  count: true,  chart: true,  voice: false, chant: true,  breath: true,  music: true,  dark: false },
+  guardian: { name: "Guardian", hint: "a little worker guards your nostril, with the breath sound",
+            circle: false, nose: true,  words: false, count: false, chart: false, voice: false, chant: false, breath: true,  music: false, dark: false },
+};
+const VIEW_KEYS = ["circle", "nose", "words", "count", "chart", "voice", "chant", "breath", "music", "dark"];
+const { name: _n, hint: _h, ...FLOW } = PRESETS.flow;
+const DEFAULTS = { preset: "flow", ...FLOW, fade: true, darkness: .9, tech: "coherent", custom: [4, 4, 4, 4],
+                   lang: "en", voiceVol: .9, voiceRate: .7, chantStyle: "soham",
+                   vol: .8, inst: .8, bowls: .7, tanpura: .5, pad: .5, chantVol: .7, breathVol: .6,
+                   follow: .6, human: .5, glow: true, ticks: false,
+                   guardStyle: "worker", noseView: "section", noseLook: "cinematic", guard3d: "mite" };
+const WORDS = {
+  en: { in: "Inhale", hold_in: "Hold", out: "Exhale", hold_out: "Hold" },
+  it: { in: "Inspira", hold_in: "Trattieni", out: "Espira", hold_out: "Pausa" },
+};
+const phaseWord = p => WORDS[opt.lang][p];
+
+const opt = { ...DEFAULTS };
+try { Object.assign(opt, JSON.parse(localStorage.getItem("mp.options") || "{}")); } catch {}
+
+function setOpt(changes) {
+  Object.assign(opt, changes);
+  if (VIEW_KEYS.some(k => k in changes) && !("preset" in changes)) {
+    // still one of the named modes, or a custom mix
+    opt.preset = Object.keys(PRESETS).find(p => VIEW_KEYS.every(k => PRESETS[p][k] === opt[k])) || "custom";
+  }
+  try { localStorage.setItem("mp.options", JSON.stringify(opt)); } catch {}
+  applyOpt();
+}
+function usePreset(p) {
+  const { name, hint, ...view } = PRESETS[p];
+  setOpt({ ...view, preset: p });
+}
+
+const soundOn = () => zen && (opt.music || opt.chant || opt.breath);
+function applyOpt() {
+  const c = document.body.classList;
+  for (const k of ["circle", "nose", "words", "count", "chart", "dark", "fade"]) c.toggle("opt-" + k, !!opt[k]);
+  c.toggle("look3d", opt.noseLook === "cinematic");
+  c.toggle("lookM", opt.noseLook === "machine");
+  document.body.style.setProperty("--darkness", opt.darkness);
+  document.querySelectorAll("[data-opt]").forEach(el => {
+    const v = opt[el.dataset.opt];
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+  });
+  document.querySelectorAll("[data-preset]").forEach(el => el.classList.toggle("on", el.dataset.preset === opt.preset));
+  $("modeName").textContent = opt.preset === "custom" ? "Custom mix" : PRESETS[opt.preset].name;
+  // sound plays only in the meditation view
+  if (soundOn()) startSound(); else stopSound();
+  if (audio) setLevels();
+  if (!(zen && opt.voice)) speechSynthesis.cancel();
+  draw();
+}
+
+// panel: modes, breathing technique and every option
+$("modes").innerHTML = Object.entries(PRESETS).map(([p, v], i) =>
+  `<button data-preset="${p}" title="Key ${i + 1}"><b>${v.name}</b><span>${v.hint}</span></button>`).join("");
+$("modes").onclick = e => { const b = e.target.closest("[data-preset]"); if (b) usePreset(b.dataset.preset); };
+document.querySelectorAll("[data-opt]").forEach(el => el.oninput = () => {
+  const v = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
+  setOpt({ [el.dataset.opt]: v });
+});
+function setPanel(on) {
+  document.body.classList.toggle("panel", on);
+  // the technique controls live in the panel while it is open or while meditating, below the chart otherwise
+  if (on || zen) $("techSlot").append($("tech"), $("custom"));
+  else $("win").before($("tech"), $("custom"));
+}
+$("optBtn").onclick = () => setPanel(true);
+$("zenOpt").onclick = () => setPanel(!document.body.classList.contains("panel"));
+$("panelClose").onclick = () => setPanel(false);
+$("panelStart").onclick = () => setZen(true);
+
+// the breathing technique is remembered too
+$("tech").value = opt.tech;
+document.querySelectorAll("#custom input").forEach((i, n) => i.value = opt.custom[n]);
+$("tech").addEventListener("change", e => setOpt({ tech: e.target.value }));
+document.querySelectorAll("#custom input").forEach(i => i.addEventListener("input", () => setOpt({ custom: customDurations() })));
+
+let zen = false;
+function setZen(on) {
+  zen = on;
+  document.body.classList.toggle("zen", on);
+  if (on && !guide) { if ($("tech").value === "off") $("tech").value = "coherent"; setGuide($("tech").value); }
+  if (on && !session) $("startBtn").click();
+  if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  history.replaceState(null, "", on ? "#meditate" : location.pathname);
+  setPanel(false);
+  applyOpt();
+  if (on && opt.voice && guide) say(phaseWord(breathAt(now()).phase));
+}
+$("zenBtn").onclick = () => setZen(true);
+$("zenExit").onclick = () => setZen(false);
+const KEYS = { c: "circle", n: "nose", y: "ticks", w: "words", s: "count", g: "chart", v: "voice", h: "chant", b: "breath", m: "music", d: "dark" };
+document.addEventListener("keydown", e => {
+  if (!zen || e.target.matches("input, select")) return;
+  const k = e.key.toLowerCase();
+  if (k === "escape") document.body.classList.contains("panel") ? setPanel(false) : setZen(false);
+  else if (k === "o") setPanel(!document.body.classList.contains("panel"));
+  else if (k === "k" && opt.noseLook === "cinematic") {
+    const all = ["mite", "knight", "soldier", "mannequin", "none"]; setOpt({ guard3d: all[(all.indexOf(opt.guard3d) + 1) % all.length] });
+  }
+  else if (k === "k") { const all = Object.keys(GUARDS); setOpt({ guardStyle: all[(all.indexOf(opt.guardStyle) + 1) % all.length] }); }
+  else if (k === "l") { const all = ["cinematic", "machine", "illustrated"]; setOpt({ noseLook: all[(all.indexOf(opt.noseLook) + 1) % all.length] }); }
+  else if (k === "i") setOpt({ noseView: opt.noseView === "inside" ? "section" : "inside" });
+  else if (KEYS[k]) setOpt({ [KEYS[k]]: !opt[KEYS[k]] });
+  else if (k >= "1" && k <= String(Object.keys(PRESETS).length)) usePreset(Object.keys(PRESETS)[+k - 1]);
+});
+
+// called by checkPhase at the start of every breathing phase
+function onPhase(b) {
+  if (!zen) return;
+  if (opt.voice) say(phaseWord(b.phase));
+  if (audio) phaseSound(b);
+}
+
+// ---- spoken voice: says each phase
+function say(text) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith(opt.lang) && v.localService);
+  // a calm human voice; macOS also ships novelty voices (Bahh, Bells…), so never just take the first
+  const prefer = { en: ["Samantha", "Daniel", "Karen", "Moira", "Serena", "Tessa"],
+                   it: ["Alice", "Federica", "Paola", "Emma", "Luca"] }[opt.lang];
+  u.voice = prefer.map(n => voices.find(v => v.name.startsWith(n))).find(Boolean) || null;
+  u.lang = { en: "en-US", it: "it-IT" }[opt.lang];
+  u.rate = opt.voiceRate; u.pitch = 0.9; u.volume = opt.voiceVol;
+  speechSynthesis.speak(u);
+}
+
+// ---- sound (Tone.js), in B♭ and tuned to the instrument recorded in sounds/recording.m4a.
+// "Follow the breath" (opt.follow, 0 free .. 1 marked) sets how much the music marks the phases:
+// at each phase change every musical event happens with that probability, and a free, generative
+// layer plays the rest of the time. "Human touch" (opt.human) loosens timing, loudness and notes.
+// When following the breath:
+// - music: notes sampled from that instrument climb while you inhale and come down while you exhale,
+//   singing bowls open each inhale and exhale, the tanpura plucks four times per phase, and the pad
+//   changes chord with every phase and opens while you inhale
+// - chant: a sung syllable per phase (So–Ham, Om or Aah), rising and falling with the breath
+// - breath: a soft breathing sound that swells in and out
+const BB = 118.9;  // B♭2 of the recording, about 30 cents above standard pitch
+const SCALE = ["Bb3", "C4", "Db4", "Eb4", "F4", "G4", "Bb4"];
+const CHORDS = {  // pad, as multiples of B♭2
+  in: [1, 1.5, 2, 2.25],          // B♭ F B♭ C: open, lifting
+  hold_in: [1.5, 2, 2.25, 3],     // F B♭ C F: high and suspended
+  out: [1, 1.5, 2, 2.4],          // B♭ F B♭ D♭: warm, settling
+  hold_out: [.5, 1, 1.5],         // low B♭ and F: rest
+};
+const VOWELS = { a: [800, 1150, 2900], o: [450, 800, 2830], u: [325, 700, 2530], m: [250, 900, 2400] };
+let audio = null;
+const rand = (a, b) => a + Math.random() * (b - a);
+const jitter = sec => rand(-sec, sec) * opt.human;            // seconds of timing looseness
+const vary = v => v * (1 - opt.human * rand(0, .4));          // softer or louder, never the same
+const marked = () => Math.random() < opt.follow;              // does this phase change get marked?
+const detune = () => 2 ** (jitter(.15) / 12);                 // a few cents off, like a real voice
+
+function startSound() {
+  if (audio || !window.Tone) return;
+  Tone.start();
+  const master = new Tone.Gain(0).toDestination();
+  const limiter = new Tone.Limiter(-6).connect(master);
+  const reverb = new Tone.Reverb({ decay: 9, wet: .45 }).connect(limiter);
+  const layer = () => new Tone.Gain(0).connect(reverb);
+  const g = { inst: layer(), bowls: layer(), tanpura: layer(), pad: layer(), chant: layer(), breath: layer() };
+  const inst = new Tone.Sampler({
+    urls: Object.fromEntries(["Eb3", "Bb3", "C4", "Db4", "Eb4", "F4", "G4", "Bb4", "C6"].map(n => [n, `${n}.m4a`])),
+    baseUrl: "sounds/samples/", release: 2, volume: -6,
+  }).connect(g.inst);
+  const tanFilter = new Tone.Filter(1800, "lowpass").connect(g.tanpura);
+  const tanpura = [1.5, 2, 2, 1].map(r => [r * BB, new Tone.PluckSynth(
+    { attackNoise: 1.2, dampening: 1800, resonance: .97, volume: -18 }).connect(tanFilter)]);
+  const padFilter = new Tone.Filter(300, "lowpass").connect(g.pad);
+  const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "fatsine", count: 3, spread: 18 },
+    envelope: { attack: 3, release: 4 }, volume: -20 }).connect(padFilter);
+  pad.triggerAttack(CHORDS.hold_out.map(r => r * BB));
+  const chant = makeChant(g.chant), breath = makeBreath(g.breath);
+  // free layer, heard more the less the music follows the breath: a steady tanpura, a melody that
+  // wanders through the scale, an occasional bowl, and a pad that drifts between chords by itself
+  let string = 0, step = 0, chord = "hold_out";
+  const freeTanpura = new Tone.Loop(time => {
+    const [f, synth] = tanpura[string++ % 4];
+    if (!marked()) synth.triggerAttack(f, time + Math.abs(jitter(.12)));
+  }, 1.2).start(0);
+  // irregular events schedule their own next time, so no two gaps are the same
+  const every = (min, max, fn) => {
+    const id = Tone.Transport.scheduleOnce(time => { if (audio === me) { fn(time); every(min, max, fn); } },
+                                           `+${rand(min, max)}`);
+    me.events.push(id);
+  };
+  const me = { events: [] };
+  every(1.6, 4.5, time => {  // melody
+    if (marked() || !inst.loaded) return;
+    step = Math.max(0, Math.min(SCALE.length - 1, step + Math.round(rand(-2, 2))));
+    if (Math.random() < .85) inst.triggerAttackRelease(SCALE[step], 3, time + Math.abs(jitter(.2)), vary(.4));
+    if (Math.random() < .04) bowl(BB * (Math.random() < .5 ? 2 : 1.5), vary(.5));
+  });
+  every(18, 40, time => {  // pad drift
+    if (marked()) return;
+    chord = Object.keys(CHORDS)[Math.floor(rand(0, 4))];
+    changeChord(chord, time);
+  });
+  Tone.Transport.start();
+  audio = Object.assign(me, { master, g, inst, tanpura, pad, padFilter, chant, breath, loops: [freeTanpura],
+            nodes: [master, limiter, reverb, ...Object.values(g), inst, tanFilter, padFilter, pad,
+                    ...tanpura.map(t => t[1]), ...chant.nodes, ...breath.nodes] });
+  setLevels();
+}
+function setLevels() {
+  audio.master.gain.rampTo(opt.vol, 1);
+  const level = { inst: opt.music && opt.inst, bowls: opt.music && opt.bowls, tanpura: opt.music && opt.tanpura,
+                  pad: opt.music && opt.pad, chant: opt.chant && opt.chantVol, breath: opt.breath && opt.breathVol };
+  for (const k in audio.g) audio.g[k].gain.rampTo(+level[k] || 0, .5);
+}
+// browsers only start sound after a click or key press: resume then if it was started without one
+for (const ev of ["pointerdown", "keydown"]) document.addEventListener(ev, () => { if (audio) Tone.start(); });
+
+function stopSound() {
+  if (!audio) return;
+  const a = audio; audio = null;
+  a.master.gain.rampTo(0, 1.5);
+  setTimeout(() => {
+    a.loops.forEach(l => l.dispose());
+    a.events.forEach(id => Tone.Transport.clear(id));
+    a.nodes.forEach(n => n.dispose());
+  }, 3000);
+}
+
+function bowl(f, vel) {
+  // a struck singing bowl: inharmonic partials, each a slightly detuned pair that beats slowly
+  const t = Tone.now() + .05;
+  for (const [ratio, amp, decay] of [[1, 1, 12], [2.76, .45, 8], [5.4, .2, 5], [8.9, .08, 3]]) {
+    for (const det of [-.7, .7]) {
+      const g = new Tone.Gain(0).connect(audio.g.bowls);
+      const o = new Tone.Oscillator(f * ratio + det * ratio, "sine").connect(g).start(t).stop(t + decay);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vel * amp * .12, t + .02);
+      g.gain.setTargetAtTime(0, t + .02, decay / 5);
+      setTimeout(() => { o.dispose(); g.dispose(); }, decay * 1000 + 1000);
+    }
+  }
+}
+
+// a small choir singing vowels: detuned sawtooths through three formant filters, plus a noise
+// source for the breathy consonants (the "s" of So, the "h" of Ham)
+function makeChant(dest) {
+  const out = new Tone.Gain(0).connect(dest);
+  const src = new Tone.FatOscillator({ type: "sawtooth", count: 3, spread: 25, frequency: BB * 2 });
+  const vib = new Tone.Vibrato(4.5, .06);
+  src.connect(vib);
+  const formants = VOWELS.o.map(f => new Tone.Filter({ type: "bandpass", Q: 9, frequency: f }));
+  const fgain = [1, .5, .18].map(v => new Tone.Gain(v).connect(out));
+  formants.forEach((f, i) => vib.chain(f, fgain[i]));
+  const noise = new Tone.Noise("pink").start();
+  const nf = new Tone.Filter({ type: "bandpass", Q: 1.5, frequency: 5000 });
+  const ng = new Tone.Gain(0).connect(dest);
+  noise.chain(nf, ng);
+  src.start();
+  return { out, src, formants, fgain, nf, ng, nodes: [out, src, vib, ...formants, ...fgain, noise, nf, ng] };
+}
+function vowel(c, v, t, ramp = .25) {
+  VOWELS[v].forEach((f, i) => c.formants[i].frequency.linearRampTo(f, ramp, t));
+  const hum = v === "m";  // a closed-mouth hum keeps almost only the lowest formant
+  [1, hum ? .06 : .5, hum ? .02 : .18].forEach((x, i) => c.fgain[i].gain.linearRampTo(x, ramp, t));
+}
+function consonant(c, kind, t) {
+  const [freq, peak, len] = kind === "s" ? [6000, .5, .3] : [1300, .35, .35];
+  c.nf.frequency.setValueAtTime(freq, t);
+  c.ng.gain.setValueAtTime(0, t);
+  c.ng.gain.linearRampToValueAtTime(peak, t + .06);
+  c.ng.gain.linearRampToValueAtTime(0, t + len);
+}
+function sing(c, t, d, loud, from, to, vowels, onsetDelay = 0) {
+  // vowels: [[vowel, start fraction], ...] across the phase
+  const s = t + onsetDelay;
+  c.src.frequency.setValueAtTime(from, s);
+  c.src.frequency.linearRampToValueAtTime(to, t + d);
+  c.out.gain.cancelScheduledValues(t);
+  c.out.gain.setValueAtTime(c.out.gain.getValueAtTime(t), t);
+  c.out.gain.linearRampToValueAtTime(loud, s + .4);
+  c.out.gain.setValueAtTime(loud, t + d - .5);
+  c.out.gain.linearRampToValueAtTime(0, t + d - .05);
+  for (const [v, frac] of vowels) vowel(c, v, frac === 0 ? s : t + d * frac);
+}
+function chantPhase(b, t) {
+  const c = audio.chant, d = b.remaining, lo = BB * 2 * detune(), hi = BB * 3 * detune();
+  const style = opt.chantStyle;
+  if (style === "soham") {                       // So on the inhale, Ham on the exhale
+    if (b.phase === "in") { consonant(c, "s", t); sing(c, t, d, .5, lo, hi, [["o", 0]], .25); }
+    if (b.phase === "hold_in") sing(c, t, d, .18, hi, hi, [["m", 0]]);
+    if (b.phase === "out") { consonant(c, "h", t); sing(c, t, d, .5, hi, lo, [["a", 0], ["m", .65]], .25); }
+  } else if (style === "om") {                   // A–U–M on one note across the exhale, a hum while full
+    if (b.phase === "hold_in") sing(c, t, d, .14, lo, lo, [["m", 0]]);
+    if (b.phase === "out") sing(c, t, d, .5, lo, lo, [["a", 0], ["o", .2], ["u", .4], ["m", .55]]);
+  } else {                                       // Aah: rises with the inhale, falls with the exhale
+    if (b.phase === "in") sing(c, t, d, .45, lo, hi, [["a", 0]]);
+    if (b.phase === "hold_in") sing(c, t, d, .2, hi, hi, [["a", 0]]);
+    if (b.phase === "out") sing(c, t, d, .45, hi, lo, [["a", 0]]);
+  }
+}
+
+// a breathing sound: filtered noise that swells in as you inhale and out as you exhale
+function makeBreath(dest) {
+  const noise = new Tone.Noise("pink").start();
+  const f = new Tone.Filter({ type: "bandpass", Q: .7, frequency: 800 });
+  const g = new Tone.Gain(0).connect(dest);
+  noise.chain(f, g);
+  return { f, g, nodes: [noise, f, g] };
+}
+
+function changeChord(phase, t) {
+  // slow crossfade: the freer the music, the longer the change takes
+  const loose = 1 - opt.follow;
+  audio.pad.set({ envelope: { attack: 2 + 5 * loose, release: 3 + 5 * loose } });
+  audio.pad.releaseAll(t);
+  audio.pad.triggerAttack(CHORDS[phase].map(r => r * BB * detune()), t + .05);
+}
+
+function phaseSound(b) {
+  const t = Tone.now() + .05, d = b.remaining;
+  // music
+  if (b.phase === "in" && marked()) bowl(BB * 2, vary(.9));
+  if (b.phase === "out" && marked()) bowl(BB * 1.5, vary(.7));
+  if (marked()) changeChord(b.phase, t + Math.abs(jitter(.4)));
+  const plucks = b.phase.startsWith("hold") ? 2 : 4;
+  for (let i = 0; i < plucks; i++) {
+    const [f, synth] = audio.tanpura[i % 4];
+    // scheduled on the transport so each string is always played in time order with the free loop
+    if (marked()) audio.events.push(Tone.Transport.scheduleOnce(time => synth.triggerAttack(f, time),
+                                                                `+${i * d / plucks + Math.abs(jitter(.15)) + .05}`));
+  }
+  if (audio.inst.loaded && marked()) {
+    const t0 = t + .8, span = d - 1;  // a moment for the bowl and the chant's consonant first
+    if (b.phase === "in" || b.phase === "out") {
+      const n = Math.max(2, Math.min(SCALE.length, Math.round(span)));  // about one note a second
+      const notes = b.phase === "in" ? SCALE.slice(0, n) : SCALE.slice(0, n).reverse();
+      notes.forEach((note, i) => {
+        if (Math.random() < opt.human * .25) return;  // now and then a note is left out
+        audio.inst.triggerAttackRelease(note, 2, t0 + i * span / n + Math.abs(jitter(.25)), vary(.5));
+      });
+    }
+    if (b.phase === "hold_in") audio.inst.triggerAttackRelease("C6", 2, t0 + Math.abs(jitter(.3)), vary(.25));
+  }
+  // chant
+  chantPhase(b, t + Math.abs(jitter(.15)));
+}
+
+// called every 100 ms: the parts that follow the breath continuously
+function updateSound() {
+  if (!audio || !guide) return;
+  const b = breathAt(now()), { p, flow } = airflow(b);
+  const drift = .5 + .3 * Math.sin(now() / 23);  // free: a slow swell of its own
+  audio.padFilter.frequency.rampTo(250 + 1400 * (opt.follow * b.level + (1 - opt.follow) * drift), .2);
+  const swell = Math.abs(flow);
+  const [gain, freq] = { in: [.5 * swell, 500 + 1300 * p], out: [.45 * swell, 1600 - 1100 * p] }[b.phase] || [0, 800];
+  audio.breath.g.gain.rampTo(gain, .12);
+  audio.breath.f.frequency.rampTo(freq, .12);
+}
+
+// air through the nose: +1 streaming in, -1 streaming out, 0 while holding. It follows how fast the
+// guide fills and empties the lungs (the slope of the breath level). The breath sound and the nose
+// guardian both use it, so what you see is what you hear.
+function airflow(b) {
+  const p = Math.min(Math.max(1 - b.remaining / b.dur, 0), 1), s = Math.sin(Math.PI * p) ** .7;
+  return { p, flow: b.phase === "in" ? s : b.phase === "out" ? -s : 0 };
+}
+
+// ---- nose guardian: a cutaway of one nostril, outside air on the left, the way in to the right. A
+// little worker, a third as tall as the passage, guards it with a net. While you inhale the current
+// rushes in carrying dust: he leans into the wind, his scarf streams inward, nose hairs bend and catch
+// some dust, and so does his net. While you exhale it all turns round: warm mist flows out and the net
+// and hairs let the dust go. Holding, the air is still and the dust floats. Deep inside, a glow beats
+// with your pulse. Turbulence comes from simplex noise (cdnjs), with a plain fallback offline.
+const NS = { W: 1600, H: 900, rim: 250, gx: 700 };  // scene size, the nostril's rim, where he stands
+const noseRoof = x => 175 + 45 * Math.sin(x / 240 + .6) - Math.max(0, x - 1050) ** 1.6 * .012;
+const noseFloor = x => 745 - 25 * Math.sin(x / 300 + 2.38) - Math.max(0, x - 1150) ** 1.6 * .01;
+const noseMid = x => (noseRoof(x) + noseFloor(x)) / 2, noseHalf = x => (noseFloor(x) - noseRoof(x)) / 2;
+const noise3 = window.SimplexNoise ? (sn => (x, y, z) => sn.noise3D(x, y, z))(new SimplexNoise())
+                                   : (x, y, z) => Math.sin(x * 2.1 + z) * Math.cos(y * 1.7 - z * .8);
+const nose = { last: 0, dash: 0, spawn: 0, motes: [], walls: null,
+               guard: { lean: 0, grip: 0, blink: 3, net: [], hoop: null, lamp: null } };
+nose.hairs = Array.from({ length: 64 }, (_, i) => {
+  const x = NS.rim + 15 + Math.random() ** 1.5 * 560;
+  return { x, top: i % 2 === 0, len: 55 + Math.random() * 85 * (1 - (x - NS.rim) / 800),
+           lean: rand(-.35, .35), ph: rand(0, 9), bend: 0, stuck: 0 };
+});
+nose.veins = Array.from({ length: 28 }, (_, i) => {
+  const top = i % 2 === 0, pts = [];
+  let x = rand(NS.rim + 20, NS.W - 100), d = rand(12, 110);
+  for (let k = 0; k < 9; k++, x += rand(12, 32), d = Math.max(8, d + rand(-10, 10)))
+    pts.push([x, top ? noseRoof(x) - d : noseFloor(x) + d]);
+  return pts;
+});
+nose.bokeh = Array.from({ length: 16 }, () => ({ x: rand(-60, NS.rim - 160), y: rand(0, NS.H), r: rand(18, 70),
+                                                 hue: rand(195, 230), a: rand(.04, .11), ph: rand(0, 9) }));
+
+function newMote(x, y, kind) {
+  const r = Math.random();
+  kind ||= r < .72 ? "dust" : r < .9 ? "pollen" : "fiber";
+  return { x, y, vx: 0, vy: 0, kind, life: 1, alpha: rand(.45, .95), rot: rand(0, 6.3), spin: rand(-2, 2),
+           back: Math.random() < .5,
+           size: kind === "mist" ? rand(22, 46) : kind === "pollen" ? rand(2.5, 4.5) : rand(1, 2.6) };
+}
+for (let i = 0; i < 180; i++) {
+  let x, y;
+  do { x = rand(-60, NS.W); y = rand(0, NS.H); }
+  while (x > NS.rim - 30 && (y < noseRoof(x) + 5 || y > noseFloor(x) - 5));
+  nose.motes.push(newMote(x, y));
+}
+
+// the current: gathers into the nostril on the inhale and spreads out on the exhale outside, runs along
+// the passage inside (fastest in the middle), with turbulence that livens up as the air moves
+function noseWind(x, y, flow, t) {
+  let vx, vy;
+  if (x < NS.rim) {
+    // each bit of air heads for its own height in the opening, so the passage fills from wall to wall
+    const m = noseMid(NS.rim), ty = m + Math.max(-1, Math.min(1, (y - m) / 380)) * noseHalf(NS.rim) * .85;
+    const dx = NS.rim + 40 - x, dy = ty - y, d = Math.hypot(dx, dy) + 60;
+    const sp = 520 * flow * Math.min(1, 280 / d);
+    vx = sp * dx / d; vy = sp * dy / d;
+  } else {
+    const u = Math.min(Math.abs(y - noseMid(x)) / noseHalf(x), 1), sp = 560 * flow * (1 - .7 * u * u);
+    vx = sp; vy = sp * (noseMid(x + 5) - noseMid(x - 5)) / 10;
+  }
+  const k = 40 + 110 * Math.abs(flow);
+  return [vx + k * noise3(x / 180, y / 180, t * .25), vy + k * noise3(x / 180 + 40, y / 180, t * .25)];
+}
+
+function noseStep(dt, t, flow) {
+  const n = nose, g = n.guard, fy = noseFloor(NS.gx);
+  // new air: dust from outside on the inhale, warm mist from inside on the exhale
+  n.spawn = Math.min(n.spawn + dt * (flow > 0 ? 140 * flow : 30 * -flow), 3);
+  for (; n.spawn >= 1 && n.motes.length < 650; n.spawn--) {
+    if (flow > 0) n.motes.push(newMote(rand(-90, -10), rand(30, NS.H - 30)));
+    else { const x = rand(NS.W - 40, NS.W + 30); n.motes.push(newMote(x, noseMid(x) + rand(-.8, .8) * noseHalf(x), "mist")); }
+  }
+  // nose hairs bend with the current, springy
+  for (const h of n.hairs) {
+    const f = h.top ? noseRoof : noseFloor, ry = f(h.x), base = (h.top ? Math.PI / 2 : -Math.PI / 2) + h.lean;
+    h.bend += (flow + .15 * noise3(h.x / 50, h.ph, t * .6) * (.4 + Math.abs(flow)) - h.bend) * Math.min(1, dt * 8);
+    const a = base + (h.top ? -1 : 1) * h.bend;
+    h.mx = h.x + Math.cos(base) * h.len * .45; h.my = ry + Math.sin(base) * h.len * .45;
+    h.tx = h.mx + Math.cos(a) * h.len * .6; h.ty = h.my + Math.sin(a) * h.len * .6; h.ry = ry;
+  }
+  const hoop = g.hoop;
+  for (const m of n.motes) {
+    const [wx, wy] = noseWind(m.x, m.y, flow, t);
+    const k = Math.min(1, dt * (m.kind === "mist" ? 2.5 : m.kind === "pollen" ? 4 : 7));
+    m.vx += (wx - m.vx) * k;
+    m.vy += (wy + (m.kind === "dust" ? 14 : m.kind === "mist" ? -6 : 4) - m.vy) * k;
+    m.x += m.vx * dt; m.y += m.vy * dt; m.rot += m.spin * dt;
+    if (m.kind === "mist") m.life -= dt * (flow < 0 ? .22 : .6);
+    if (m.x > NS.rim - 30) {  // walls
+      const top = noseRoof(m.x) + 2, bot = noseFloor(m.x) - 2;
+      if (m.y < top) { m.y = top; m.vy = Math.abs(m.vy) * .3; }
+      if (m.y > bot) { m.y = bot; m.vy = -Math.abs(m.vy) * .3; }
+    }
+    if (m.kind === "mist") continue;
+    const dx = (m.x - NS.gx) / 58, dy = (m.y - fy + 100) / 102, d = dx * dx + dy * dy;  // around him
+    if (d < 1) { const s = 1 / Math.sqrt(d || .01); m.x = NS.gx + dx * s * 58; m.y = fy - 100 + dy * s * 102; }
+    if (hoop && flow > .25 && g.net.length < 25 && Math.abs(m.x - hoop.x) < 22 && Math.abs(m.y - hoop.y) < hoop.r
+        && Math.random() < .3) {
+      g.net.push({ u: Math.random(), v: rand(-1, 1), kind: m.kind, size: m.size }); m.gone = true;
+    }
+    if (flow > .3 && m.kind === "dust" && m.x < NS.rim + 600 && Math.random() < .4) {
+      for (const h of n.hairs) if (h.stuck < 3 && Math.abs(m.x - h.tx) < 10 && Math.abs(m.y - h.ty) < 10) {
+        h.stuck++; m.gone = true; break;
+      }
+    }
+  }
+  // the exhale lets the caught dust go
+  if (flow < -.25) {
+    for (const h of n.hairs) if (h.stuck && Math.random() < dt * 1.5) { h.stuck--; n.motes.push(newMote(h.tx, h.ty, "dust")); }
+    if (g.net.length && hoop && Math.random() < dt * 14) {
+      const c = g.net.pop();
+      n.motes.push(Object.assign(newMote(hoop.x - 12, hoop.y + rand(-.6, .6) * hoop.r, c.kind), { size: c.size }));
+    }
+  }
+  n.motes = n.motes.filter(m => !m.gone && m.life > 0 && m.x > -150 && m.x < NS.W + 150 && m.y > -100 && m.y < NS.H + 100);
+}
+
+function noseWalls() {
+  const wall = top => {
+    const p = new Path2D(), f = top ? noseRoof : noseFloor, edge = top ? -40 : NS.H + 40, r = NS.rim;
+    const y0 = f(r), out = top ? -1 : 1;  // away from the passage
+    // the outer skin curves away from the opening, then the rounded rim
+    p.moveTo(r + 90, edge); p.bezierCurveTo(r + 20, y0 + out * 150, r - 80, y0 + out * 100, r - 80, y0 + out * 40);
+    p.bezierCurveTo(r - 80, y0 - out * 20, r - 30, y0 - out * 28, r + 20, f(r + 20));
+    for (let x = r + 40; x <= NS.W + 40; x += 20) p.lineTo(x, f(x));
+    p.lineTo(NS.W + 40, edge); p.closePath();
+    const e = new Path2D();  // just the inner surface
+    e.moveTo(r - 80, y0 + out * 40);
+    e.bezierCurveTo(r - 80, y0 - out * 20, r - 30, y0 - out * 28, r + 20, f(r + 20));
+    for (let x = r + 40; x <= NS.W + 40; x += 20) e.lineTo(x, f(x));
+    return { p, e, top };
+  };
+  return [wall(true), wall(false)];
+}
+
+// how much the guardian's light catches a speck at (x, y): a headlamp beam (cone) or a torch (round)
+function glintAt(x, y, L) {
+  if (!L) return 0;
+  const dx = x - L.x, dy = y - L.y, dist = Math.hypot(dx, dy);
+  if (dist > L.r) return 0;
+  if (!L.cone) return .7 * (1 - dist / L.r) * L.flick;
+  const off = Math.abs(((Math.atan2(dy, dx) - L.a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+  return off < .3 ? (1 - off / .3) * (1 - dist / L.r) : 0;
+}
+
+// one speck at screen position (x, y), (px, py) where it was a moment ago, sc its scale
+function drawMote(ctx, m, x, y, px, py, sc, glint, fade = 1) {
+  const r = m.size * sc;
+  if (m.kind === "mist") {
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(255,232,222,${(.17 * m.life * fade).toFixed(3)})`); gr.addColorStop(1, "rgba(255,232,222,0)");
+    ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    return;
+  }
+  ctx.globalAlpha = Math.min(1, m.alpha * fade + glint);
+  const col = glint > .2 ? "#fffbe8" : null;
+  if (m.kind === "pollen") {
+    ctx.fillStyle = col || "#e7c55a"; ctx.strokeStyle = col || "#e7c55a"; ctx.lineWidth = .8 * sc;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) {
+      const a = m.rot + i * .9;
+      ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); ctx.lineTo(x + Math.cos(a) * r * 1.7, y + Math.sin(a) * r * 1.7);
+    }
+    ctx.stroke();
+  } else if (m.kind === "fiber") {
+    ctx.strokeStyle = col || "#d9d0c2"; ctx.lineWidth = .9 * sc;
+    const c = Math.cos(m.rot) * 8 * sc, s = Math.sin(m.rot) * 8 * sc;
+    ctx.beginPath(); ctx.moveTo(x - c, y - s); ctx.quadraticCurveTo(x + s * .5, y - c * .5, x + c, y + s); ctx.stroke();
+  } else if (Math.hypot(x - px, y - py) > 3) {  // a streak when the current is fast
+    ctx.strokeStyle = col || "#ddcdb2"; ctx.lineWidth = r * 1.6; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(px, py); ctx.stroke();
+  } else {
+    ctx.fillStyle = col || "#ddcdb2"; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+const gLine = (ctx, pts, w, col) => {
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+};
+const gDisc = (ctx, x, y, rx, ry, col, rot = 0) => {
+  ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, 7); ctx.fill();
+};
+// a ribbon (scarf, cape, plume, pennant) from (x, y): each segment's angle comes from ang(i)
+function gRibbon(ctx, x, y, n, step, ang, w0, w1, col) {
+  const pts = [[x, y]];
+  for (let i = 1; i <= n; i++) { const a = ang(i), [px, py] = pts[i - 1]; pts.push([px + step * Math.cos(a), py + step * Math.sin(a)]); }
+  for (let i = 1; i < pts.length; i++) gLine(ctx, [pts[i - 1], pts[i]], w0 + (w1 - w0) * i / n, col);
+}
+// the guardian's face in profile, looking out (to the left); squints into the inhale wind
+function gFace(ctx, t, flow, g, tache) {
+  const wind = Math.abs(flow);
+  gDisc(ctx, 0, -158, 27, 27, "#f0c4a0"); gDisc(ctx, 18, -156, 6, 7, "#e3ad8c");
+  gDisc(ctx, -12, -147, 6, 5, "rgba(230,120,110,.35)");
+  const open = g.blink < 0 ? .1 : Math.max(.15, 1 - .75 * Math.max(0, flow));
+  for (const ex of [-17, -4]) {
+    gDisc(ctx, ex, -162, 4.2, 5 * open, "#fff");
+    if (open > .3) gDisc(ctx, ex - 1.5, -162, 2.4, 2.4 * Math.min(1, open * 1.3), "#2a1d17");
+    gLine(ctx, [[ex - 5, -169 - 2 * open + Math.sin(t * 9 + ex) * wind], [ex + 4, -170 - 2 * open]], 3, tache);
+  }
+  gDisc(ctx, -26, -152, 7, 6, "#e6a98a");
+  if (flow < .2) { ctx.strokeStyle = "#7a3b2f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(-14, -138, 5, .3, 2.6); ctx.stroke(); }
+  const mo = flow * 7;  // moustache tips flutter downwind
+  gDisc(ctx, -21 + mo * .3, -143, 10, 5.5, tache, -.25 + flow * .2);
+  gDisc(ctx, -8 + mo * .5, -143, 10, 5.5, tache, .25 + flow * .2);
+}
+// the free hand: on the hip, or holding the helmet in a strong wind
+function gFreeArm(ctx, g, sleeve) {
+  const hand = [36 + (26 - 36) * g.grip, -84 + (-178 + 84) * g.grip];
+  gLine(ctx, [[24, -122], hand], 13, sleeve); gDisc(ctx, hand[0], hand[1], 7.5, 7.5, "#f0c4a0");
+}
+function gBody(ctx, light, dark) {
+  const body = new Path2D(); body.roundRect(-36, -136, 72, 84, 22);
+  const bg = ctx.createLinearGradient(-36, 0, 36, 0); bg.addColorStop(0, light); bg.addColorStop(1, dark);
+  ctx.fillStyle = bg; ctx.fill(body);
+  return body;
+}
+// a torch planted in the floor beside the soldier; its flame bends with the current
+function gTorch(ctx, t, flow, back) {
+  gLine(ctx, [[86, 0], [86, -150]], 6, "#5a3a22");
+  ctx.fillStyle = "#3a3a3a"; ctx.beginPath(); ctx.moveTo(74, -160); ctx.lineTo(98, -160); ctx.lineTo(92, -146); ctx.lineTo(80, -146); ctx.fill();
+  const fl = noise3(t * 3, 7, 0), wind = Math.abs(flow);
+  const tx = 86 + (back ? 4 * Math.sin(t * 11) * wind : flow * 38) + 5 * fl, ty = -205 + 14 * wind - 6 * fl;
+  for (const [w, col] of [[13, "#ff8a2a"], [7, "#ffd36b"]]) {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(86 - w, -160);
+    ctx.quadraticCurveTo(86 - w, -175, tx, ty + (13 - w) * 1.6); ctx.quadraticCurveTo(86 + w, -175, 86 + w, -160);
+    ctx.arc(86, -160, w, 0, Math.PI); ctx.fill();
+  }
+  return { x: 86, y: -178, cone: false, r: 320, flick: .85 + .15 * fl, fixed: true };
+}
+
+// ---- the guardian: a worker with a net and a headlamp, a medieval soldier with shield, spear and a
+// torch, a glowing microbe that catches dust on its sticky skin, or an ant holding up a leaf with a
+// firefly lantern. In profile ("side", the cutaway) or from behind ("back", seen from inside the nose). Drawn
+// with his feet at the origin, about 200 units tall. Returns, in those units, what catches dust and
+// where his light is.
+function drawGuard(ctx, t, dt, flow, back) {
+  const g = nose.guard, wind = Math.abs(flow), ease = k => Math.min(1, dt * k);
+  // lean into the wind (in profile), sway a little when the air is still
+  const lean = (back ? .03 * wind * Math.sin(t * 7) : -flow * .2) + (1 - wind) * .025 * Math.sin(t * 1.1);
+  g.lean += (lean - g.lean) * ease(3);
+  g.grip += ((wind > .45 ? 1 : 0) - g.grip) * ease(4);
+  g.blink -= dt; if (g.blink < -.13) g.blink = rand(2, 6);
+  const style = GUARDS[opt.guardStyle] ? opt.guardStyle : "worker", soldier = style === "soldier";
+  ctx.save();
+  gDisc(ctx, 0, 2, 64, 10, "rgba(0,0,0,.35)");  // shadow
+  const st = 17 + 9 * wind;  // feet braced wider in the wind
+  if (style === "worker" || soldier) for (const sx of [-st, st]) {
+    ctx.fillStyle = soldier ? "#4a3322" : "#3b2a20"; ctx.beginPath(); ctx.roundRect(sx - 16, -13, 30, 13, 6); ctx.fill();
+  }
+  const torch = soldier ? gTorch(ctx, t, flow, back) : null;
+  ctx.rotate(g.lean);
+  const parts = GUARDS[style][back ? 1 : 0](ctx, t, flow, wind, st, g);
+  ctx.restore();
+  return { catcher: parts.catcher, lamp: torch || parts.lamp };
+}
+
+function workerSide(ctx, t, flow, wind, st, g) {
+  const ang = Math.atan2((1 - wind) * .9 + .1, flow) - g.lean;  // scarf: hangs, or streams with the current
+  gRibbon(ctx, 4, -132, 9, 9, i => ang + Math.sin(t * (6 + 10 * wind) - i * .8) * (.08 + .3 * wind) * i / 9, 11.4, 6, "#c8353a");
+  gLine(ctx, [[-st, -10], [-10, -62]], 15, "#2f3d5c"); gLine(ctx, [[st, -10], [10, -62]], 15, "#2f3d5c");
+  const body = gBody(ctx, "#f39445", "#bf5b20");
+  ctx.save(); ctx.clip(body);
+  ctx.fillStyle = "rgba(243,239,208,.85)"; ctx.fillRect(-36, -90, 72, 7);  // reflective stripe
+  ctx.fillStyle = "#cf6826"; ctx.beginPath(); ctx.roundRect(-18, -130, 36, 30, 6); ctx.fill();
+  ctx.restore();
+  gDisc(ctx, -11, -112, 3, 3, "#f6d27a"); gDisc(ctx, 11, -112, 3, 3, "#f6d27a");
+  // net: staff, hoop facing the way in, and a bag that billows downwind
+  const hx = -118, hy = -206;
+  gLine(ctx, [[-55, -10], [-118, -172]], 5, "#8a5a32");
+  const tipX = hx + 8 * (1 - wind) + flow * 62 + (flow < -.25 ? Math.sin(t * 30) * 4 : 0);
+  const tipY = hy + 46 * (1 - wind) + 6 * Math.sin(t * 18) * wind;
+  const bag = new Path2D();
+  bag.moveTo(hx, hy - 34); bag.quadraticCurveTo(hx + (tipX - hx) * .7, hy - 30 + (tipY - hy) * .5, tipX, tipY);
+  bag.quadraticCurveTo(hx + (tipX - hx) * .7, hy + 30 + (tipY - hy) * .5, hx, hy + 34);
+  ctx.fillStyle = "rgba(235,230,215,.16)"; ctx.fill(bag);
+  ctx.strokeStyle = "rgba(235,230,215,.55)"; ctx.lineWidth = 1.2; ctx.stroke(bag);
+  ctx.beginPath();
+  for (let k = -2; k <= 2; k++) { ctx.moveTo(hx, hy + k * 15); ctx.lineTo(tipX, tipY); }
+  ctx.strokeStyle = "rgba(235,230,215,.3)"; ctx.stroke();
+  for (const c of g.net) {
+    const u = .25 + .7 * c.u;
+    gDisc(ctx, hx + (tipX - hx) * u, hy + (tipY - hy) * u + c.v * (1 - u) * 26, c.size, c.size, c.kind === "pollen" ? "#e7c55a" : "#ddcdb2");
+  }
+  ctx.strokeStyle = "#cfc8b4"; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(hx, hy, 9, 34, 0, 0, 7); ctx.stroke();
+  gLine(ctx, [[-24, -124], [-91, -104]], 13, "#e2742c"); gDisc(ctx, -91, -104, 7.5, 7.5, "#f0c4a0");
+  gFace(ctx, t, flow, g, "#ece6dc");
+  // helmet with headlamp
+  ctx.fillStyle = "#f2c230"; ctx.beginPath(); ctx.arc(0, -168, 31, Math.PI, 2 * Math.PI); ctx.fill();
+  gDisc(ctx, -11, -188, 9, 5, "rgba(255,255,255,.4)", -.4);
+  ctx.fillStyle = "#e0ad1e"; ctx.beginPath(); ctx.roundRect(-46, -171, 82, 7, 3); ctx.fill();
+  gDisc(ctx, -31, -180, 7, 7, "#444"); gDisc(ctx, -32, -180, 4.8, 4.8, "#fff7cf");
+  gFreeArm(ctx, g, "#e2742c");
+  return { catcher: { x: hx, y: hy, r: 34 },
+           lamp: { x: -36, y: -180, cone: true, r: 650, a: Math.PI - .12 + .14 * Math.sin(t * .35) } };
+}
+
+function workerBack(ctx, t, flow, wind, st, g) {
+  gLine(ctx, [[-st, -10], [-10, -62]], 15, "#2f3d5c"); gLine(ctx, [[st, -10], [10, -62]], 15, "#2f3d5c");
+  const body = gBody(ctx, "#ee8a3c", "#c9621f");
+  ctx.save(); ctx.clip(body);
+  ctx.fillStyle = "rgba(243,239,208,.85)"; ctx.fillRect(-36, -90, 72, 7);
+  gLine(ctx, [[-24, -136], [16, -92]], 7, "#cf6826"); gLine(ctx, [[24, -136], [-16, -92]], 7, "#cf6826");  // crossed straps
+  ctx.restore();
+  // scarf: blown towards us on the inhale, pressed to his back on the exhale
+  const len = 8 + 6 * Math.max(0, flow) - 4 * Math.max(0, -flow);
+  gRibbon(ctx, 6, -132, 8, len, i => 1.1 - .5 * wind + Math.sin(t * (6 + 10 * wind) - i * .8) * (.1 + .35 * wind) * i / 8, 11, 6, "#c8353a");
+  // head from behind: grey hair, ears, helmet with the headlamp's strap
+  gDisc(ctx, 0, -158, 27, 27, "#f0c4a0"); gDisc(ctx, -27, -157, 5, 7, "#e3ad8c"); gDisc(ctx, 27, -157, 5, 7, "#e3ad8c");
+  gDisc(ctx, 0, -146, 22, 12, "#ddd6ca");
+  ctx.fillStyle = "#f2c230"; ctx.beginPath(); ctx.arc(0, -168, 32, Math.PI, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "#e0ad1e"; ctx.beginPath(); ctx.roundRect(-40, -171, 80, 7, 3); ctx.fill();
+  ctx.strokeStyle = "#333"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, -168, 26, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+  // net held up towards the opening: we see the hoop face on, the bag billows towards us on the inhale
+  const hx = -82, hy = -236, cx = hx + 4 * Math.sin(t * 17) * wind, cy = hy + 10 * Math.max(0, flow) - 6 * Math.max(0, -flow);
+  gLine(ctx, [[-50, -40], [hx + 10, hy + 33]], 5, "#8a5a32");
+  ctx.fillStyle = "rgba(235,230,215,.14)"; ctx.beginPath(); ctx.arc(hx, hy, 34, 0, 7); ctx.fill();
+  ctx.strokeStyle = "rgba(235,230,215,.4)"; ctx.lineWidth = 1.1; ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; ctx.moveTo(hx + 34 * Math.cos(a), hy + 34 * Math.sin(a)); ctx.lineTo(cx, cy); }
+  ctx.stroke();
+  for (const c of g.net) gDisc(ctx, cx + c.v * 18 * c.u, cy + (c.u - .5) * 22, c.size, c.size, c.kind === "pollen" ? "#e7c55a" : "#ddcdb2");
+  ctx.strokeStyle = "#cfc8b4"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(hx, hy, 34, 0, 7); ctx.stroke();
+  gLine(ctx, [[-26, -124], [-58, -168]], 13, "#e2742c"); gDisc(ctx, -58, -170, 7.5, 7.5, "#f0c4a0");
+  gFreeArm(ctx, g, "#e2742c");
+  return { catcher: { x: hx, y: hy, r: 34 }, lamp: { x: 0, y: -192, cone: true, r: 650, a: 0 } };
+}
+
+function soldierBody(ctx) {
+  const body = gBody(ctx, "#a2a8b0", "#6e747c");  // mail
+  ctx.save(); ctx.clip(body);
+  ctx.strokeStyle = "rgba(40,44,50,.35)"; ctx.lineWidth = 1;
+  for (let y = -136; y < -50; y += 6) for (let x = -36 + (y % 12 ? 3 : 0); x < 36; x += 6) { ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI); ctx.stroke(); }
+  ctx.restore();
+}
+
+function soldierSide(ctx, t, flow, wind, st, g) {
+  const ang = Math.atan2((1 - wind) * 1.2 + .2, flow * .9) - g.lean;  // cape, heavier than a scarf
+  gRibbon(ctx, 8, -128, 8, 11, i => ang + Math.sin(t * (5 + 8 * wind) - i * .7) * (.06 + .25 * wind) * i / 8, 26, 12, "#7d1f2a");
+  // spear in the far hand, with a pennant that streams downwind
+  gLine(ctx, [[30, -6], [30, -252]], 4.5, "#7a5230");
+  ctx.fillStyle = "#cfd5dc"; ctx.beginPath(); ctx.moveTo(25, -250); ctx.lineTo(30, -280); ctx.lineTo(35, -250); ctx.fill();
+  const pa = Math.atan2((1 - wind) * 1.3 + .1, flow) - g.lean;
+  gRibbon(ctx, 30, -244, 6, 8, i => pa + Math.sin(t * (7 + 12 * wind) - i) * (.1 + .3 * wind) * i / 6, 14, 2, "#e2b93b");
+  gLine(ctx, [[-st, -10], [-10, -62]], 14, "#5b5f66"); gLine(ctx, [[st, -10], [10, -62]], 14, "#5b5f66");
+  soldierBody(ctx);
+  // tabard with a gold chevron, and a belt
+  ctx.fillStyle = "#2d4f8e"; ctx.beginPath(); ctx.roundRect(-26, -132, 52, 84, 8); ctx.fill();
+  gLine(ctx, [[-24, -78], [0, -104], [24, -78]], 8, "#e2b93b");
+  ctx.fillStyle = "#5a3a22"; ctx.fillRect(-35, -76, 70, 7); ctx.fillStyle = "#c9a54a"; ctx.fillRect(-4, -77, 8, 9);
+  gFace(ctx, t, flow, g, "#7a5636");
+  // conical helmet with a nasal bar, and a plume that streams downwind
+  const plume = Math.atan2(-(1 - wind) * 1 + .25 * wind, flow * 1.2 + (1 - wind) * .45) - g.lean;
+  gRibbon(ctx, 2, -204, 6, 8, i => plume + (1 - wind) * .25 * i + Math.sin(t * (6 + 10 * wind) - i) * (.08 + .3 * wind) * i / 6, 10, 3, "#c8353a");
+  const hg = ctx.createLinearGradient(-30, 0, 30, 0); hg.addColorStop(0, "#c3cad2"); hg.addColorStop(1, "#6f7780");
+  ctx.fillStyle = hg; ctx.beginPath(); ctx.moveTo(-31, -166); ctx.quadraticCurveTo(-26, -196, 2, -206); ctx.quadraticCurveTo(28, -196, 31, -166); ctx.fill();
+  ctx.fillStyle = "#7d858e"; ctx.fillRect(-32, -170, 64, 6);
+  ctx.fillStyle = "#8a929b"; ctx.beginPath(); ctx.roundRect(-30, -170, 5, 24, 2); ctx.fill();
+  // round shield on the arm facing the way in; dust sticks to it on the inhale
+  gLine(ctx, [[-22, -124], [-55, -108]], 12, "#8e949c");
+  const sx = -64, sy = -106;
+  gDisc(ctx, sx, sy, 20, 50, "#2d4f8e");
+  ctx.strokeStyle = "#b0b6bd"; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(sx, sy, 20, 50, 0, 0, 7); ctx.stroke();
+  gLine(ctx, [[sx - 6, sy - 46], [sx - 6, sy + 46]], 5, "#e2b93b");
+  gDisc(ctx, sx - 3, sy, 7, 9, "#c9ced4");
+  for (const c of g.net) gDisc(ctx, sx - 8 + c.u * 10, sy + c.v * 40, c.size, c.size, c.kind === "pollen" ? "#e7c55a" : "#ddcdb2");
+  gFreeArm(ctx, g, "#8e949c");
+  return { catcher: { x: sx, y: sy, r: 50 } };
+}
+
+function soldierBack(ctx, t, flow, wind, st, g) {
+  gLine(ctx, [[-st, -10], [-10, -62]], 14, "#5b5f66"); gLine(ctx, [[st, -10], [10, -62]], 14, "#5b5f66");
+  soldierBody(ctx);
+  // spear in his right hand, pennant fluttering
+  gLine(ctx, [[44, -6], [44, -262]], 4.5, "#7a5230");
+  ctx.fillStyle = "#cfd5dc"; ctx.beginPath(); ctx.moveTo(39, -260); ctx.lineTo(44, -290); ctx.lineTo(49, -260); ctx.fill();
+  gRibbon(ctx, 44, -254, 6, 8, i => 1.3 * (1 - wind) + .2 + Math.sin(t * (7 + 12 * wind) - i) * (.1 + .45 * wind) * i / 6, 14, 2, "#e2b93b");
+  // head and helmet from behind, plume
+  gDisc(ctx, 0, -158, 27, 27, "#f0c4a0"); gDisc(ctx, 0, -150, 24, 14, "#7a5636");
+  const hg = ctx.createLinearGradient(-30, 0, 30, 0); hg.addColorStop(0, "#c3cad2"); hg.addColorStop(1, "#6f7780");
+  ctx.fillStyle = hg; ctx.beginPath(); ctx.moveTo(-31, -164); ctx.quadraticCurveTo(-26, -196, 0, -206); ctx.quadraticCurveTo(26, -196, 31, -164); ctx.fill();
+  ctx.fillStyle = "#7d858e"; ctx.fillRect(-32, -168, 64, 6);
+  gRibbon(ctx, 0, -204, 6, 7 + 3 * Math.max(0, flow), i => -Math.PI / 2 + (.5 + .9 * Math.max(0, flow)) * i / 3 + Math.sin(t * (6 + 10 * wind) - i) * (.08 + .3 * wind),
+          10, 3, "#c8353a");
+  // cape: billows towards us on the inhale, pressed flat to his back on the exhale
+  const hw = 40 + 24 * Math.max(0, flow) - 8 * Math.max(0, -flow), hem = -34 + 12 * Math.max(0, flow);
+  const wv = k => Math.sin(t * (5 + 9 * wind) + k) * (2 + 9 * wind);
+  ctx.fillStyle = "#7d1f2a"; ctx.beginPath(); ctx.moveTo(-30, -132); ctx.lineTo(30, -132);
+  ctx.quadraticCurveTo(hw * .8, -90, hw + wv(0), hem);
+  ctx.quadraticCurveTo(hw * .5, hem + 8 + wv(1), 0, hem + wv(2));
+  ctx.quadraticCurveTo(-hw * .5, hem + 8 + wv(3), -hw + wv(4), hem);
+  ctx.quadraticCurveTo(-hw * .8, -90, -30, -132); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 2;
+  for (const k of [-.45, 0, .45]) { ctx.beginPath(); ctx.moveTo(k * 40, -126); ctx.quadraticCurveTo(k * hw * 1.1, -80, k * hw * 1.4 + wv(k * 3), hem + 4); ctx.stroke(); }
+  // shield from behind: planks, straps and an iron rim
+  gLine(ctx, [[-28, -124], [-56, -112]], 12, "#8e949c");
+  const sx = -64, sy = -112;
+  ctx.save(); ctx.beginPath(); ctx.arc(sx, sy, 46, 0, 7); ctx.fillStyle = "#7a4e26"; ctx.fill(); ctx.clip();
+  ctx.strokeStyle = "rgba(0,0,0,.3)"; ctx.lineWidth = 2;
+  for (let x = sx - 46; x < sx + 46; x += 15) { ctx.beginPath(); ctx.moveTo(x, sy - 50); ctx.lineTo(x, sy + 50); ctx.stroke(); }
+  ctx.restore();
+  ctx.strokeStyle = "#b0b6bd"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(sx, sy, 46, 0, 7); ctx.stroke();
+  gLine(ctx, [[sx - 26, sy - 6], [sx + 26, sy - 6]], 6, "#5a3a22"); gDisc(ctx, sx + 8, sy - 6, 7.5, 7.5, "#f0c4a0");
+  return { catcher: { x: sx, y: sy, r: 46 } };
+}
+
+// a strange microbe: a wobbly, glowing capsule with cilia and whipping flagella; dust sticks to the
+// side the air comes from
+function microbe(ctx, t, flow, wind, st, g, back) {
+  const pts = [];
+  for (let i = 0; i < 40; i++) {
+    const a = i / 40 * 2 * Math.PI, w = 1 + .07 * noise3(Math.cos(a), Math.sin(a), t * .8);
+    const rx = 50 * (1 + .1 * wind) * w, ry = 92 * w * (1 - .05 * wind);
+    pts.push([rx * Math.sign(Math.cos(a)) * Math.abs(Math.cos(a)) ** .8, -96 + ry * Math.sign(Math.sin(a)) * Math.abs(Math.sin(a)) ** .8, a]);
+  }
+  // flagella, trailing downwind
+  const fa = Math.atan2((1 - wind) * .7 + .15, back ? .2 : flow) - g.lean;
+  for (const [x, y, ph] of [[26, -30, 0], [40, -70, 2], [30, -150, 4]])
+    gRibbon(ctx, x, y, 14, back ? 6 + 3 * Math.max(0, flow) : 7, i => fa + Math.sin(t * (4 + 10 * wind) - i * .6 + ph) * .35 * Math.min(1, i / 4), 3, 1, "rgba(120,220,170,.8)");
+  // cilia, bent by the current
+  ctx.strokeStyle = "rgba(160,240,200,.7)"; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (const [x, y, a] of pts) {
+    const c = Math.cos(a), sn = Math.sin(a), wv = Math.sin(t * (8 + 14 * wind) + a * 5) * 2;
+    ctx.moveTo(x, y); ctx.lineTo(x + c * 8 + (back ? wv : flow * 6 + wv * .5), y + sn * 8 + (back ? Math.max(0, flow) * 4 : wv * .5));
+  }
+  ctx.stroke();
+  const body = new Path2D(); pts.forEach(([x, y], i) => i ? body.lineTo(x, y) : body.moveTo(x, y)); body.closePath();
+  const gr = ctx.createRadialGradient(-12, -120, 10, 0, -96, 100);
+  gr.addColorStop(0, "rgba(170,250,210,.95)"); gr.addColorStop(1, "rgba(40,150,110,.9)");
+  ctx.fillStyle = gr; ctx.fill(body);
+  ctx.strokeStyle = "rgba(220,255,235,.8)"; ctx.lineWidth = 3; ctx.stroke(body);
+  ctx.save(); ctx.clip(body);
+  for (let i = 0; i < 14; i++)  // granules drifting inside
+    gDisc(ctx, 26 * Math.sin(i * 2.3 + t * .3), -96 + 70 * Math.sin(i * 1.7 + t * .2), 4 + (i % 3) * 2, 4 + (i % 3) * 2, "rgba(20,110,80,.45)");
+  gDisc(ctx, 6, -80, 16, 14, "rgba(90,40,120,.35)");  // its knotted DNA, roughly
+  ctx.restore();
+  for (const c of g.net) {  // stuck dust
+    const a = back ? c.u * 2 * Math.PI : Math.PI + c.v * 1.1, r = back ? .6 : 1;
+    gDisc(ctx, 50 * r * Math.cos(a), -96 + 90 * r * Math.sin(a), c.size, c.size, c.kind === "pollen" ? "#e7c55a" : "#ddcdb2");
+  }
+  if (!back) {  // big eyes, looking out
+    const open = g.blink < 0 ? .1 : Math.max(.2, 1 - .7 * Math.max(0, flow));
+    for (const ex of [-22, 4]) {
+      gDisc(ctx, ex, -150, 11, 12 * open, "#fff");
+      if (open > .3) gDisc(ctx, ex - 4, -150, 5, 5 * Math.min(1, open * 1.3), "#123");
+    }
+    ctx.strokeStyle = "#1d5a44"; ctx.lineWidth = 2.5; ctx.beginPath();
+    if (flow > .3) ctx.arc(-10, -122, 5, 0, 7); else ctx.arc(-10, -128, 7, .3, 2.8);
+    ctx.stroke();
+  }
+  return { catcher: { x: back ? 0 : -45, y: -96, r: back ? 60 : 80 },
+           lamp: { x: 0, y: -96, cone: false, r: 260, flick: .8 + .2 * Math.sin(t * 2), rgb: "120,255,190" } };
+}
+
+// a small ant standing on its hind legs, holding up a leaf against the dust, a firefly lantern in a
+// lower hand; the antennae stream with the current
+function ant(ctx, t, flow, wind, st, g, back) {
+  const dark = "#a5562f", shell = "#7a2e1a";  // legs and feelers lighter, to show on the dark passage
+  const leg = sx => gLine(ctx, [[sx * .4, -70], [sx * 1.2, -40], [sx, -4]], 5, dark);
+  leg(-st); leg(st);
+  // antennae: elbowed, streaming downwind
+  const aa = back ? -Math.PI / 2 : Math.atan2(-(1 - wind) * 1.1 + .1 * wind, flow * 1.2 - (1 - wind) * .5) - g.lean;
+  for (const [x0, ph] of back ? [[-12, 0], [12, 2]] : [[-20, 0], [-8, 2]]) {
+    gLine(ctx, [[x0, -180], [x0 + (back ? x0 : -6), -204]], 3, dark);
+    gRibbon(ctx, x0 + (back ? x0 : -6), -204, 6, back ? 6 - 2 * Math.max(0, flow) : 7,
+            i => aa + (back ? x0 / 20 : 0) + Math.sin(t * (5 + 12 * wind) - i + ph) * (.06 + .3 * wind) * i / 6, 3, 2, dark);
+  }
+  const shine = (x, y, rx, ry, rot) => {
+    const gr = ctx.createRadialGradient(x - rx * .3, y - ry * .4, 2, x, y, Math.max(rx, ry));
+    gr.addColorStop(0, "#b85a3a"); gr.addColorStop(1, shell);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, 7); ctx.fill();
+  };
+  if (back) {
+    shine(0, -120, 18, 30, 0); shine(0, -162, 25, 22, 0); shine(0, -72, 34, 40, 0);
+  } else {
+    shine(26, -74, 30, 40, .5); gDisc(ctx, 8, -94, 7, 7, shell); shine(0, -120, 17, 30, -.2);
+    shine(-12, -162, 26, 23, 0);
+    gDisc(ctx, -24, -166, 9, 11, "#120a07"); gDisc(ctx, -27, -170, 3, 3.5, "rgba(255,255,255,.8)");
+    gLine(ctx, [[-34, -150], [-42, -146], [-38, -140]], 3, dark);  // mandibles
+  }
+  // firefly lantern
+  const lx = back ? 58 : 66, ly = -66;
+  gLine(ctx, [[back ? 16 : 6, -112], [lx - 8, -96], [lx, ly - 18]], 4, dark);
+  gLine(ctx, [[lx, ly - 18], [lx, ly - 10]], 1.5, "#888");
+  gDisc(ctx, lx, ly, 9, 11, "rgba(230,255,150,.85)"); ctx.strokeStyle = "#555"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(lx, ly, 9, 11, 0, 0, 7); ctx.stroke();
+  // leaf held up against the way in; dust sticks to it
+  const lfx = back ? -60 : -66, lfy = -128, rot = (back ? 0 : -flow * .25) + Math.sin(t * (6 + 14 * wind)) * .05 * wind;
+  gLine(ctx, [[back ? -16 : -8, -134], [lfx + 12, lfy + 6]], 4, dark); gLine(ctx, [[back ? -14 : -6, -118], [lfx + 12, lfy + 20]], 4, dark);
+  ctx.save(); ctx.translate(lfx, lfy); ctx.rotate(rot);
+  ctx.fillStyle = back ? "#8fc46a" : "#5aa33f"; ctx.beginPath();
+  const lw = back ? 34 : 20;
+  ctx.moveTo(0, -56); ctx.quadraticCurveTo(lw, -10, 0, 52); ctx.quadraticCurveTo(-lw, -10, 0, -56); ctx.fill();
+  gLine(ctx, [[0, -54], [0, 50]], 2, "#3d7a2a");
+  for (const c of g.net) gDisc(ctx, c.v * lw * .5, (c.u - .5) * 80, c.size, c.size, c.kind === "pollen" ? "#e7c55a" : "#ddcdb2");
+  ctx.restore();
+  return { catcher: { x: lfx, y: lfy, r: 50 },
+           lamp: { x: lx, y: ly, cone: false, r: 240, flick: .75 + .25 * Math.max(0, Math.sin(t * 1.7)), rgb: "200,255,110" } };
+}
+
+const GUARDS = {
+  worker: [workerSide, workerBack], soldier: [soldierSide, soldierBack],
+  microbe: [(...a) => microbe(...a, false), (...a) => microbe(...a, true)],
+  ant: [(...a) => ant(...a, false), (...a) => ant(...a, true)],
+};
+
+// the guardian's light: a warm torch glow, or the headlamp's beam
+function drawLight(ctx, L) {
+  if (!L) return;
+  ctx.globalCompositeOperation = "lighter";
+  const gr = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.r);
+  if (L.cone) {
+    gr.addColorStop(0, "rgba(255,240,200,.16)"); gr.addColorStop(1, "rgba(255,240,200,0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(L.x, L.y); ctx.arc(L.x, L.y, L.r, L.a - .3, L.a + .3); ctx.closePath(); ctx.fill();
+  } else {
+    const rgb = L.rgb || "255,170,80";
+    gr.addColorStop(0, `rgba(${rgb},${(.28 * L.flick).toFixed(3)})`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = gr; ctx.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2);
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+// a point of the guardian's drawing (feet at the origin, before his lean) placed at (x0, y0) with scale s
+function guardPoint(p, x0, y0, s) {
+  if (!p) return null;
+  const l = p.fixed ? 0 : nose.guard.lean, c = Math.cos(l), sn = Math.sin(l);
+  return { ...p, x: x0 + s * (p.x * c - p.y * sn), y: y0 + s * (p.x * sn + p.y * c), r: p.r * s, a: (p.a || 0) + l };
+}
+
+function drawNose() {
+  if (!zen || !opt.nose) { nose.last = 0; return; }
+  const c = $("nose"), dpr = devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const t = now(), dt = nose.last ? Math.min(t - nose.last, .05) : 0;
+  nose.last = t;
+  const flow = guide ? airflow(breathAt(t)).flow : 0;
+  if (opt.noseLook === "cinematic") {  // the 3D scene, in the module script at the end of the page
+    window.nose3d?.frame($("nose3d"), t, dt, flow, { guard: opt.guard3d, beat: heartBeat(t), level: guide ? breathAt(t).level : .5 });
+    return;
+  }
+  if (opt.noseLook === "machine") {  // the steam machine, in the same module
+    window.nose3d?.machine($("noseM"), t, dt, flow, { beat: heartBeat(t), level: guide ? breathAt(t).level : .5 });
+    return;
+  }
+  const ctx = c.getContext("2d"), s = Math.max(w / NS.W, h / NS.H);
+  if (opt.noseView === "inside") {
+    ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * (w - NS.W * s) / 2, dpr * (h - NS.H * s) / 2);
+    insideStep(dt, t, flow);
+    drawInside(ctx, t, dt, flow);
+  } else {
+    // keep the opening in view when the screen is narrower than the scene: crop mostly on the inside
+    ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * (w - NS.W * s) * .2, dpr * (h - NS.H * s) / 2);
+    noseStep(dt, t, flow);
+    drawSection(ctx, t, dt, flow);
+  }
+  const gr = ctx.createRadialGradient(NS.W / 2, NS.H / 2, 300, NS.W / 2, NS.H / 2, 980);  // vignette
+  gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,.55)");
+  ctx.fillStyle = gr; ctx.fillRect(-400, -100, NS.W + 800, NS.H + 200);
+}
+
+function drawSection(ctx, t, dt, flow) {
+  const wind = Math.abs(flow), W = NS.W, H = NS.H, g = nose.guard;
+  // outside: air and soft out-of-focus lights
+  let gr = ctx.createLinearGradient(0, 0, NS.rim - 80, 0);
+  gr.addColorStop(0, "#132a3c"); gr.addColorStop(1, "#0b1621");
+  ctx.fillStyle = gr; ctx.fillRect(-400, -100, W + 800, H + 200);
+  for (const b of nose.bokeh) disc2(ctx, b.x + 8 * Math.sin(t * .1 + b.ph), b.y, b.r,
+                                    `hsla(${b.hue},60%,72%,${(b.a * (.8 + .2 * Math.sin(t * .3 + b.ph))).toFixed(3)})`);
+  // the passage, darker and warmer further in, with a glow deep inside that beats with your pulse
+  const pass = new Path2D();
+  pass.moveTo(NS.rim - 80, noseRoof(NS.rim));
+  for (let x = NS.rim; x <= W + 40; x += 20) pass.lineTo(x, noseRoof(x));
+  for (let x = W + 40; x >= NS.rim; x -= 20) pass.lineTo(x, noseFloor(x));
+  pass.lineTo(NS.rim - 80, noseFloor(NS.rim)); pass.closePath();
+  gr = ctx.createLinearGradient(NS.rim - 80, 0, W, 0);  // blends from the outside air at the opening
+  gr.addColorStop(0, "#0b1621"); gr.addColorStop(.1, "#3a2630"); gr.addColorStop(.4, "#2a161d"); gr.addColorStop(1, "#140609");
+  ctx.fillStyle = gr; ctx.fill(pass);
+  const beat = heartBeat(t);
+  gr = ctx.createRadialGradient(W - 80, noseMid(W - 150), 0, W - 80, noseMid(W - 150), 460);
+  gr.addColorStop(0, `rgba(255,80,70,${(.1 + .12 * beat).toFixed(3)})`); gr.addColorStop(1, "rgba(255,80,70,0)");
+  ctx.fillStyle = gr; ctx.fill(pass);
+  // the current: faint dashes that run in or out
+  nose.dash += flow * 520 * dt;
+  if (wind > .02) {
+    ctx.setLineDash([26, 54]); ctx.lineDashOffset = -nose.dash; ctx.lineWidth = 2;
+    ctx.strokeStyle = flow > 0 ? `rgba(170,210,255,${(.14 * wind).toFixed(3)})` : `rgba(255,205,170,${(.14 * wind).toFixed(3)})`;
+    for (let j = 1; j < 10; j++) {
+      const f = j / 5 - 1;
+      ctx.beginPath();
+      for (let x = -100; x <= W + 40; x += 25) {
+        const xr = Math.max(x, NS.rim), spread = x < NS.rim ? 1 + (NS.rim - x) / NS.rim * 1.3 : 1;
+        const y = noseMid(xr) + f * noseHalf(xr) * .85 * spread + 5 * Math.sin(x / 80 + j - t * 3 * flow);
+        x === -100 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  const mote = m => drawMote(ctx, m, m.x, m.y, m.x - m.vx * .035, m.y - m.vy * .035, 1, glintAt(m.x, m.y, g.lamp), m.back ? .55 : 1);
+  for (const m of nose.motes) if (m.back && m.kind !== "mist") mote(m);
+  // walls: skin at the rim, moist pink mucosa further in, with fine vessels and a wet sheen
+  nose.walls ||= noseWalls();
+  for (const wl of nose.walls) {
+    gr = ctx.createLinearGradient(NS.rim - 80, 0, W, 0);
+    gr.addColorStop(0, "#c98f7c"); gr.addColorStop(.07, "#c46b70"); gr.addColorStop(.35, "#a54556");
+    gr.addColorStop(.7, "#6e2635"); gr.addColorStop(1, "#2c0d14");
+    ctx.fillStyle = gr; ctx.fill(wl.p);
+    ctx.save(); ctx.clip(wl.p);
+    gr = wl.top ? ctx.createLinearGradient(0, 0, 0, 230) : ctx.createLinearGradient(0, H, 0, 700);
+    gr.addColorStop(0, "rgba(10,0,4,.55)"); gr.addColorStop(1, "rgba(10,0,4,0)");
+    ctx.fillStyle = gr; ctx.fillRect(-100, -50, W + 200, H + 100);
+    ctx.strokeStyle = "rgba(120,15,35,.35)"; ctx.lineWidth = 1.4;
+    for (const v of nose.veins) { ctx.beginPath(); v.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(255,190,190,.16)"; ctx.lineWidth = 16; ctx.stroke(wl.e);
+    ctx.strokeStyle = "rgba(255,238,238,.32)"; ctx.lineWidth = 2.5; ctx.stroke(wl.e);
+    ctx.restore();
+  }
+  // nose hairs, and the dust stuck on them
+  for (const hh of nose.hairs) {
+    if (hh.tx === undefined) continue;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(hh.x, hh.ry); ctx.quadraticCurveTo(hh.mx, hh.my, hh.tx, hh.ty);
+    ctx.strokeStyle = "#2b1712"; ctx.lineWidth = 3.2; ctx.stroke();
+    ctx.strokeStyle = "rgba(110,72,58,.6)"; ctx.lineWidth = 1.1; ctx.stroke();
+    for (let k = 0; k < hh.stuck; k++) disc2(ctx, hh.tx + (k - 1) * 3, hh.ty + (k % 2) * 3, 1.8, "#ddcdb2");
+  }
+  const fy = noseFloor(NS.gx);
+  ctx.save(); ctx.translate(NS.gx, fy);
+  const parts = drawGuard(ctx, t, dt, flow, false);
+  ctx.restore();
+  g.hoop = guardPoint(parts.catcher, NS.gx, fy, 1); g.lamp = guardPoint(parts.lamp, NS.gx, fy, 1);
+  for (const m of nose.motes) if (!m.back || m.kind === "mist") mote(m);
+  drawLight(ctx, g.lamp);
+}
+function disc2(ctx, x, y, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+// 0..1, a quick rise and slow fall on each of your heartbeats
+function heartBeat(t) { const bpm = hr.at(-1)?.bpm || 60; return Math.exp(-((t * bpm / 60) % 1) * 5); }
+
+// ---- the same nostril seen from inside, looking out: a tunnel in perspective with the bright world
+// beyond the opening. Inhaling, dust flies in from the opening towards you; exhaling, it flies away and
+// out with the warm mist. The guardian stands on the floor facing the opening, seen from behind.
+const NI = { cx: 800, cy: 430, f: 600, near: 110, z0: 900, zg: 690, gx: -150 };
+const smooth = (a, b, x) => { const u = Math.min(Math.max((x - a) / (b - a), 0), 1); return u * u * (3 - 2 * u); };
+const tunnelR = z => { const k = smooth(NI.z0 - 260, NI.z0, z); return [420 - 80 * k, 300 - 70 * k]; };
+const proj = (x, y, z) => [NI.cx + x * NI.f / z, NI.cy + y * NI.f / z, NI.f / z];
+const wob = (a, z) => 1 + .07 * noise3(Math.cos(a) * 1.3, Math.sin(a) * 1.3, z / 260);  // not a perfect tube
+function tunnelPoint(a, z, k = 1) { const [rx, ry] = tunnelR(z), w = wob(a, z) * k; return [rx * w * Math.cos(a), ry * w * Math.sin(a), z]; }
+nose.motes3 = []; nose.spawn3 = 0;
+nose.hairs3 = Array.from({ length: 56 }, () => {
+  const a = rand(0, 2 * Math.PI), z = rand(NI.z0 - 230, NI.z0 - 15);
+  return { a, z, root: tunnelPoint(a, z), len: rand(40, 95), curl: rand(-.5, .5), ph: rand(0, 9), bend: 0 };
+});
+nose.veins3 = Array.from({ length: 26 }, () => {
+  let a = rand(0, 2 * Math.PI), z = rand(NI.near + 60, NI.z0 - 40);
+  return Array.from({ length: 9 }, () => { a += rand(-.05, .05); z += rand(15, 45); return tunnelPoint(a, Math.min(z, NI.z0), .995); });
+});
+
+function insideWalls() {
+  // bands of wall between successive depths, lighter towards the opening, where the light comes in
+  const N = 48, zs = Array.from({ length: N + 1 }, (_, i) => 1 / (1 / NI.near + (1 / NI.z0 - 1 / NI.near) * i / N));
+  const ring = (p, z) => {
+    for (let i = 0; i <= 60; i++) {
+      const [x, y] = proj(...tunnelPoint(i / 60 * 2 * Math.PI, z));
+      i ? p.lineTo(x, y) : p.moveTo(x, y);
+    }
+    p.closePath();
+  };
+  const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  return zs.slice(0, -1).map((z, i) => {
+    const p = new Path2D();
+    if (i === 0) p.rect(-400, -100, NS.W + 800, NS.H + 200); else ring(p, z);
+    ring(p, zs[i + 1]);
+    const k = Math.min(Math.max((zs[i + 1] - 260) / (NI.z0 - 260), 0), 1) ** 1.8;
+    const [r, g, b] = mix([22, 5, 9], [206, 118, 120], k).map(v => v * (i % 2 ? .95 : 1));  // folds
+    return { p, col: i === N - 1 ? "#e2a48e" : `rgb(${r | 0},${g | 0},${b | 0})` };
+  });
+}
+
+function insideStep(dt, t, flow) {
+  const n = nose, g = n.guard;
+  // new air: dust from beyond the opening on the inhale, warm mist from behind you on the exhale
+  n.spawn3 = Math.min(n.spawn3 + dt * (flow > 0 ? 150 * flow : 30 * -flow), 3);
+  for (; n.spawn3 >= 1 && n.motes3.length < 700; n.spawn3--) {
+    const a = rand(0, 2 * Math.PI);
+    if (flow > 0) {
+      const z = rand(NI.z0 + 40, NI.z0 + 600), [rx, ry] = tunnelR(NI.z0), r = Math.sqrt(Math.random()) * .9 * z / NI.z0;
+      n.motes3.push(Object.assign(newMote(rx * r * Math.cos(a), ry * r * Math.sin(a)), { z, vz: 0 }));
+    } else {
+      const z = rand(NI.near + 20, 300), [rx, ry] = tunnelR(z), r = Math.sqrt(Math.random()) * .8;
+      n.motes3.push(Object.assign(newMote(rx * r * Math.cos(a), ry * r * Math.sin(a), "mist"), { z, vz: 0, size: rand(40, 90) }));
+    }
+  }
+  const c = g.catch3, k = 40 + 110 * Math.abs(flow);
+  for (const m of n.motes3) {
+    const zz = Math.min(m.z, NI.z0), [rx, ry] = tunnelR(zz), u = Math.min(1, Math.hypot(m.x / rx, m.y / ry));
+    const tz = -flow * 650 * (1 - .6 * u * u);
+    let tx = k * noise3(m.x / 180, m.z / 180, t * .25), ty = k * noise3(m.y / 180 + 40, m.z / 180, t * .25);
+    if (m.z > NI.z0) { tx += m.x * tz / m.z; ty += m.y * tz / m.z; }  // outside: gathered into the opening, or spread out
+    const kk = Math.min(1, dt * (m.kind === "mist" ? 2.5 : m.kind === "pollen" ? 4 : 7));
+    m.vx += (tx - m.vx) * kk; m.vy += (ty + (m.kind === "dust" ? 14 : m.kind === "mist" ? -6 : 4) - m.vy) * kk; m.vz += (tz - m.vz) * kk;
+    m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt; m.rot += m.spin * dt;
+    if (m.kind === "mist") m.life -= dt * (flow < 0 ? .22 : .6);
+    if (m.z < NI.z0) {  // walls
+      const e = Math.hypot(m.x / tunnelR(m.z)[0], m.y / tunnelR(m.z)[1]);
+      if (e > .93) { m.x *= .93 / e; m.y *= .93 / e; }
+    }
+    if (c && m.kind !== "mist" && flow > .25 && g.net.length < 25 && Math.abs(m.z - c.z) < 30
+        && Math.hypot(m.x - c.x, m.y - c.y) < c.r && Math.random() < .3) {
+      g.net.push({ u: Math.random(), v: rand(-1, 1), kind: m.kind, size: m.size }); m.gone = true;
+    }
+  }
+  if (flow < -.25 && c && g.net.length && Math.random() < dt * 14) {
+    const caught = g.net.pop();
+    n.motes3.push(Object.assign(newMote(c.x + rand(-.5, .5) * c.r, c.y + rand(-.5, .5) * c.r, caught.kind), { z: c.z + 10, vz: 0, size: caught.size }));
+  }
+  n.motes3 = n.motes3.filter(m => !m.gone && m.life > 0 && m.z > 45 && m.z < NI.z0 + 760);
+}
+
+function drawInside(ctx, t, dt, flow) {
+  const g = nose.guard, wind = Math.abs(flow);
+  // the world outside, bright and out of focus
+  const [ox, oy] = proj(0, 0, NI.z0), [rx0, ry0] = tunnelR(NI.z0), orx = rx0 * NI.f / NI.z0, ory = ry0 * NI.f / NI.z0;
+  let gr = ctx.createLinearGradient(0, oy - ory, 0, oy + ory);
+  gr.addColorStop(0, "#7fb2dc"); gr.addColorStop(.55, "#c4dbe8"); gr.addColorStop(.7, "#9cbf8a"); gr.addColorStop(1, "#6f9a62");
+  ctx.fillStyle = gr; ctx.fillRect(-400, -100, NS.W + 800, NS.H + 200);  // sky and blurred green
+  for (const b of nose.bokeh) disc2(ctx, ox + ((b.x + 60) / 150 - .5) * orx * 1.8 + 10 * Math.sin(t * .1 + b.ph), oy + (b.y / NS.H - .5) * ory * 2,
+                                    b.r * .8, `hsla(${b.hue - 160},70%,85%,${(b.a * 2.5).toFixed(3)})`);
+  gr = ctx.createRadialGradient(ox + orx * .4, oy - ory * .5, 0, ox + orx * .4, oy - ory * .5, orx);
+  gr.addColorStop(0, "rgba(255,255,240,.45)"); gr.addColorStop(1, "rgba(255,255,240,0)");
+  ctx.fillStyle = gr; ctx.fillRect(ox - orx * 2, oy - ory * 2, orx * 4, ory * 4);
+  const mote = m => {
+    const [x, y, s] = proj(m.x, m.y, m.z), [px, py] = proj(m.x - m.vx * .04, m.y - m.vy * .04, m.z - m.vz * .04);
+    const near = Math.min(1, (m.z - 45) / 220);  // fades as it flies past you
+    const sc = Math.min(s * 1.4, 5);  // close up it is out of focus: bigger and fainter
+    drawMote(ctx, m, x, y, px, py, sc, glintAt(x, y, g.lamp), near * Math.min(1, 2.2 / sc));
+  };
+  const order = nose.motes3.slice().sort((a, b) => b.z - a.z);
+  for (const m of order) if (m.z >= NI.z0) mote(m);
+  // walls, the nostril's rim, light spilling in, fine vessels
+  nose.walls3 ||= insideWalls();
+  for (const b of nose.walls3) { ctx.fillStyle = b.col; ctx.fill(b.p, "evenodd"); }
+  ctx.strokeStyle = "rgba(120,15,35,.3)"; ctx.lineWidth = 1.4;
+  for (const v of nose.veins3) { ctx.beginPath(); v.forEach((p, i) => { const [x, y] = proj(...p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); }
+  ctx.globalCompositeOperation = "lighter";
+  gr = ctx.createRadialGradient(ox, oy, orx * .8, ox, oy, orx * 2.4);
+  gr.addColorStop(0, "rgba(255,225,200,.16)"); gr.addColorStop(1, "rgba(255,225,200,0)");
+  ctx.fillStyle = gr; ctx.fillRect(-400, -100, NS.W + 800, NS.H + 200);
+  // deep behind you, the glow that beats with your pulse, on the walls nearest you
+  gr = ctx.createRadialGradient(NI.cx, NI.cy, 500, NI.cx, NI.cy, 1100);
+  gr.addColorStop(0, "rgba(255,60,50,0)"); gr.addColorStop(1, `rgba(255,60,50,${(.05 + .1 * heartBeat(t)).toFixed(3)})`);
+  ctx.fillStyle = gr; ctx.fillRect(-400, -100, NS.W + 800, NS.H + 200);
+  ctx.globalCompositeOperation = "source-over";
+  // nose hairs around the opening, dark against the light; they lean towards you on the inhale
+  for (const h of nose.hairs3) {
+    h.bend += (flow + .15 * noise3(h.a * 3, h.ph, t * .6) * (.4 + wind) - h.bend) * Math.min(1, dt * 8);
+    const [x0, y0, z0] = h.root, d = Math.hypot(x0, y0), ix = -x0 / d, iy = -y0 / d;
+    const mid = [x0 + (ix - iy * h.curl) * h.len * .45, y0 + (iy + ix * h.curl) * h.len * .45, z0 - h.bend * h.len * .25];
+    const tip = [mid[0] + ix * h.len * .5 * (1 - .4 * Math.abs(h.bend)), mid[1] + iy * h.len * .5 * (1 - .4 * Math.abs(h.bend)), mid[2] - h.bend * h.len * .6];
+    const [ax, ay, s] = proj(x0, y0, z0), [bx, by] = proj(...mid), [cx, cy] = proj(...tip);
+    ctx.strokeStyle = "#3b2018"; ctx.lineWidth = 1.7 * s; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(bx, by, cx, cy); ctx.stroke();
+  }
+  for (const m of order) if (m.z < NI.z0 && m.z >= NI.zg) mote(m);
+  // the guardian on the floor, facing the opening
+  const fy = tunnelR(NI.zg)[1] * wob(Math.PI / 2, NI.zg) * .97, [sx, sy, s] = proj(NI.gx, fy, NI.zg);
+  ctx.save(); ctx.translate(sx, sy); ctx.scale(s, s);
+  const parts = drawGuard(ctx, t, dt, flow, true);
+  ctx.restore();
+  const cp = guardPoint(parts.catcher, NI.gx, fy, 1);
+  g.catch3 = { x: cp.x, y: cp.y, z: NI.zg + 25, r: cp.r };
+  g.lamp = guardPoint(parts.lamp, sx, sy, s);
+  if (g.lamp.cone) { g.lamp.a = Math.atan2(oy - g.lamp.y, ox - g.lamp.x); g.lamp.r = Math.hypot(ox - g.lamp.x, oy - g.lamp.y) * 1.2; }
+  for (const m of order) if (m.z < NI.zg) mote(m);
+  drawLight(ctx, g.lamp);
+}
+
+let idleTimer;
+function wake() {
+  document.body.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add("idle"), 3000);
+}
+for (const ev of ["mousemove", "touchstart", "keydown"]) document.addEventListener(ev, wake, { passive: true });
+wake();
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && zen) setZen(false); });
+applyOpt();
+if (location.hash === "#ultra") setOpt({ words: false });  // menu bar: "Meditation View · No Words"
+if (location.hash === "#meditate" || location.hash === "#ultra") setZen(true);
+
+// ---- keep the screen on (handled by hr_monitor.py with caffeinate; in the web app, a screen wake lock)
+let awake = false;
+function showAwake(on) {
+  awake = on;
+  $("awakeBtn").className = on ? "on" : "";
+  $("awakeBtn").textContent = on ? "Screen stays on ✓" : "Keep screen on";
+}
+let wakeLock = null;
+const lockScreen = async () => { try { wakeLock = await navigator.wakeLock.request("screen"); return true; } catch { return false; } };
+$("awakeBtn").onclick = async () => {
+  if (!WEB) return fetch("/awake", { method: "POST", headers: { "Content-Type": "application/json" },
+                                     body: JSON.stringify({ on: !awake }) }).catch(() => {});
+  if (awake) { wakeLock?.release(); wakeLock = null; showAwake(false); }
+  else if (await lockScreen()) showAwake(true);
+  else $("awakeBtn").textContent = "Not available in this browser";
+};
+// the browser drops the lock whenever the page is hidden; take it again on return
+document.addEventListener("visibilitychange", () => { if (WEB && awake && document.visibilityState === "visible") lockScreen(); });
+
+// ---- the web app: heart rate straight from a watch or chest strap over Web Bluetooth (the standard
+// Heart Rate service, read the way hr_monitor.py reads it); reconnects if the sensor drops
+function parseHr(v) {
+  const f = v.getUint8(0), bpm = f & 1 ? v.getUint16(1, true) : v.getUint8(1), rr = [];
+  let i = (f & 1 ? 3 : 2) + (f & 8 ? 2 : 0);  // skip energy expended
+  if (f & 16) for (; i + 1 < v.byteLength; i += 2) rr.push(v.getUint16(i, true) / 1024 * 1000);
+  return { bpm, rr };
+}
+let bt = null;  // {dev, last}
+async function btAttach(dev) {
+  try {
+    setStatus("connecting", dev.name);
+    const svc = await (await dev.gatt.connect()).getPrimaryService("heart_rate");
+    const ch = await svc.getCharacteristic("heart_rate_measurement");
+    ch.addEventListener("characteristicvaluechanged", e => {
+      if (!$("dot").className) setStatus("connected", dev.name);  // data again after a silence
+      bt.last = now(); onHr({ t: now(), ...parseHr(e.target.value) });
+    });
+    await ch.startNotifications();
+    bt.last = now(); setStatus("connected", dev.name);
+  } catch { setStatus("disconnected", dev.name); setTimeout(() => dev.gatt.connected || btAttach(dev), 4000); }
+}
+async function btConnect() {
+  if (!navigator.bluetooth) return setStatus("web_nobt");
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: ["heart_rate"] }] });
+    bt = { dev, last: now() };
+    dev.addEventListener("gattserverdisconnected", () => { setStatus("disconnected", dev.name); setTimeout(() => btAttach(dev), 2000); });
+    await btAttach(dev);
+  } catch (e) { if (e.name !== "NotFoundError") setStatus("web_error"); }  // NotFoundError: the chooser was cancelled
+}
+if (WEB) {
+  $("stopBtn").textContent = "Connect heart rate";
+  $("stopBtn").title = "Pair a watch or chest strap that broadcasts heart rate over Bluetooth";
+  $("stopBtn").onclick = btConnect;
+  setStatus("web");
+  setInterval(() => { if (bt?.dev.gatt.connected && now() - bt.last > 10) setStatus("no_data", bt.dev.name); }, 5000);
+}
+
+// ---- live stream from hr_monitor.py
+let stopped = false;
+if (!WEB) $("stopBtn").onclick = () => {
+  stopped = true;
+  postBreath(null);
+  fetch("/quit", { method: "POST" }).catch(() => {});
+};
+function connect() {
+  const es = new EventSource("/events");
+  es.onmessage = e => {
+    stopped = false;
+    const m = JSON.parse(e.data);
+    if (m.type === "status") setStatus(m.status, m.device);
+    else if (m.type === "hr") onHr(m);
+    else if (m.type === "awake") showAwake(m.on);
+  };
+  es.onerror = () => {
+    es.close();
+    setStatus(stopped ? "Monitor stopped — start it again from the ♥ in the menu bar"
+                      : "Monitor not reachable — retrying… (start it from the ♥ in the menu bar)");
+    setTimeout(connect, 2000);
+  };
+}
+if (!WEB) connect();
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// ---- nose guardian, cinematic: the same nostril in real-time 3D (Three.js, WebGL). The camera is
+// inside the nose looking out at the bright world through the opening. Wet tissue reflects the daylight
+// coming in, nose hairs bend with the current, dust drifts in and out of focus, light shafts fall
+// through the opening, and a red glow behind you beats with your pulse. A guardian stands in the
+// passage, a third as tall: a Demodex mite (they really live in the nose), a medieval knight whose hair,
+// beard and standard blow in the current, or a 3D figure loaded from the three.js examples (Soldier, Xbot). The main script calls nose3d.frame() on every animation frame
+// with the airflow, the same curve the breath sound follows.
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const sn = new SimplexNoise(), n3 = (x, y, z) => sn.noise3D(x, y, z);
+const smooth = (a, b, x) => { const u = Math.min(Math.max((x - a) / (b - a), 0), 1); return u * u * (3 - 2 * u); };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const MODELS = { soldier: "Soldier.glb", mannequin: "Xbot.glb" };
+const MODEL_URL = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/";
+const ZOPEN = -14, ZG = -6, GX = -.75, KZ = -4.3;  // the opening; where the guardian stands (the knight nearer)
+
+// the passage: an organic, slightly flattened tube that narrows towards the nostril and flares at its rim
+function tunnelR(a, z) {
+  const k = smooth(-8, -13.5, z), flare = smooth(-13.4, -15.6, z);
+  const n = 1 + .09 * n3(Math.cos(a) * 1.3, Math.sin(a) * 1.3, z * .3) + .035 * n3(Math.cos(a) * 4, Math.sin(a) * 4, z * 1.2)
+              + .02 * Math.sin(a * 9 + z * .8);
+  const rim = 1 + 1.8 * flare * flare;
+  return [(3.1 - .8 * k) * n * rim, (2.3 - .6 * k) * n * rim];
+}
+const floorY = z => -tunnelR(-Math.PI / 2, z)[1];
+
+function tissueTextures() {
+  // colour: mottled pink mucosa with fine vessels; normals: small folds and pores. u wraps around.
+  const W = 1024, H = 512, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#c44a55"; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * W, y = Math.random() * H, r = rnd(6, 40), light = Math.random() < .5;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, light ? "rgba(235,150,150,.18)" : "rgba(110,20,35,.16)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  g.lineCap = "round";
+  for (let i = 0; i < 70; i++) {  // vessels: branching random walks
+    let x = Math.random() * W, y = Math.random() * H, a = rnd(0, 6.3), w = rnd(1, 3);
+    g.strokeStyle = `rgba(${rnd(120, 160) | 0},15,30,${rnd(.25, .5).toFixed(2)})`;
+    for (let k = 0; k < 60 && w > .3; k++) {
+      const nx = x + Math.cos(a) * 8, ny = y + Math.sin(a) * 8;
+      g.lineWidth = w; g.beginPath(); g.moveTo(x, y); g.lineTo(nx, ny); g.stroke();
+      x = (nx + W) % W; y = ny; a += rnd(-.4, .4); w *= .985;
+    }
+  }
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 4;
+  const NW = 512, NH = 256, h = new Float32Array(NW * NH);
+  for (let j = 0; j < NH; j++) for (let i = 0; i < NW; i++) {
+    const a = i / NW * 2 * Math.PI, v = j / NH;
+    h[j * NW + i] = .6 * n3(Math.cos(a) * 3, Math.sin(a) * 3, v * 8) + .3 * n3(Math.cos(a) * 9, Math.sin(a) * 9, v * 24);
+
+  }
+  const nd = new Uint8Array(NW * NH * 4);
+  for (let j = 0; j < NH; j++) for (let i = 0; i < NW; i++) {
+    const dx = h[j * NW + (i + 1) % NW] - h[j * NW + (i + NW - 1) % NW], dy = h[Math.min(j + 1, NH - 1) * NW + i] - h[Math.max(j - 1, 0) * NW + i];
+    const nx = -dx * 2.2, ny = -dy * 2.2, l = Math.hypot(nx, ny, 1), o = (j * NW + i) * 4;
+    nd[o] = (nx / l * .5 + .5) * 255; nd[o + 1] = (ny / l * .5 + .5) * 255; nd[o + 2] = (1 / l * .5 + .5) * 255; nd[o + 3] = 255;
+  }
+  const normal = new THREE.DataTexture(nd, NW, NH, THREE.RGBAFormat);
+  normal.wrapS = normal.wrapT = THREE.RepeatWrapping; normal.needsUpdate = true;
+  return { map, normal };
+}
+
+function tunnel() {
+  const NU = 140, NV = 180, Z0 = 4, Z1 = -15.6, pos = [], uv = [], col = [], idx = [];
+  for (let j = 0; j <= NV; j++) {
+    const z = Z0 + (Z1 - Z0) * j / NV;
+    for (let i = 0; i <= NU; i++) {
+      const a = i / NU * 2 * Math.PI, [rx, ry] = tunnelR(a, z);
+      pos.push(rx * Math.cos(a), ry * Math.sin(a), z);
+      uv.push(i / NU * 2, j / NV * 4);
+      const d = .35 + .65 * smooth(2, -6, z);  // darker behind the camera
+      col.push(d, d, d);
+    }
+  }
+  for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) {
+    const a = j * (NU + 1) + i, b = a + NU + 1;
+    idx.push(a, b, a + 1, b, b + 1, a + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const { map, normal } = tissueTextures();
+  const m = new THREE.MeshPhysicalMaterial({
+    map, normalMap: normal, normalScale: new THREE.Vector2(.45, .45), vertexColors: true, side: THREE.DoubleSide,
+    roughness: .62, specularIntensity: .35, clearcoat: .25, clearcoatRoughness: .14, emissive: 0x2a0408,
+    envMapIntensity: .05,
+  });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+// nose hairs: one instanced, tapered cylinder, bent in the vertex shader by the current: gusts that differ
+// from hair to hair, and a fast flutter while the air rushes past
+function hairs(scene) {
+  const N = 260, geo = new THREE.CylinderGeometry(.005, .016, 1, 5, 14, true);
+  geo.translate(0, .5, 0);
+  const phase = new Float32Array(N), len = new Float32Array(N);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2a160e, roughness: .38, metalness: 0 });
+  const uni = { uBend: { value: 0 }, uTime: { value: 0 } };
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uni);
+    sh.vertexShader = "attribute float aPhase, aLen;\nuniform float uBend;\nuniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>",
+      `#include <begin_vertex>
+       float hh = position.y, w = min(abs(uBend), 1.3);
+       float gust = .65 + .35 * sin(uTime * 1.7 + aPhase * 12.) * sin(uTime * .9 + aPhase * 5.);
+       float flutter = w * (.09 * sin(uTime * 17. + aPhase * 40. + hh * 7.) + .05 * sin(uTime * 29. + aPhase * 13. - hh * 11.));
+       float b = .75 * uBend * gust + .12 * sin(uTime * 2.7 + aPhase * 6.283) * (.3 + w) + flutter;
+       transformed.z += b * hh * hh * aLen;
+       transformed.y -= .5 * b * b * hh * hh * hh;  // bend rather than stretch
+       transformed.x += ((.05 + .08 * w) * sin(uTime * 1.1 + aPhase * 9.0) * hh * hh + .5 * flutter * hh) * aLen;`);
+  };
+  const mesh = new THREE.InstancedMesh(geo, mat, N), M = new THREE.Matrix4(), Z = new THREE.Vector3(0, 0, 1);
+  for (let i = 0; i < N; i++) {
+    const a = rnd(0, 2 * Math.PI), z = rnd(-13.3, -9.2), [rx, ry] = tunnelR(a, z);
+    const root = new THREE.Vector3(rx * Math.cos(a) * .985, ry * Math.sin(a) * .985, z);
+    const Y = new THREE.Vector3(-root.x, -root.y, 0).normalize().add(new THREE.Vector3(rnd(-.2, .2), rnd(-.2, .2), rnd(.05, .45))).normalize();
+    const Zl = Z.clone().addScaledVector(Y, -Y.dot(Z)).normalize(), X = new THREE.Vector3().crossVectors(Y, Zl);
+    len[i] = rnd(.35, .95);
+    M.makeBasis(X, Y, Zl).scale(new THREE.Vector3(1, len[i], 1)).setPosition(root);
+    mesh.setMatrixAt(i, M); phase[i] = Math.random();
+  }
+  geo.setAttribute("aPhase", new THREE.InstancedBufferAttribute(phase, 1));
+  geo.setAttribute("aLen", new THREE.InstancedBufferAttribute(len, 1));
+  mesh.castShadow = true;
+  scene.add(mesh);
+  return uni;
+}
+
+// the world outside: bright, out of focus sky, horizon and greenery, bright enough to bloom
+function sky(scene) {
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    vertexShader: `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: `varying vec3 vDir;
+      float h(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+      float vn(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+        return mix(mix(mix(h(i), h(i + vec3(1,0,0)), f.x), mix(h(i + vec3(0,1,0)), h(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(h(i + vec3(0,0,1)), h(i + vec3(1,0,1)), f.x), mix(h(i + vec3(0,1,1)), h(i + vec3(1,1,1)), f.x), f.y), f.z); }
+      void main() {
+        float y = vDir.y;
+        vec3 top = vec3(.36, .58, .95) * .9, hor = vec3(1.05, .97, .86) * 1.1, low = vec3(.28, .48, .22) * .7;
+        vec3 c = y > 0. ? mix(hor, top, smoothstep(0., .5, y)) : mix(hor, low, smoothstep(0., .12, -y));
+        float leaves = vn(vDir * 9.) * .6 + vn(vDir * 23.) * .4;
+        c *= y < .05 ? .75 + .5 * leaves : .92 + .16 * leaves;
+        float sun = pow(max(dot(vDir, normalize(vec3(.35, .32, -1.))), 0.), 40.);
+        gl_FragColor = vec4(c + vec3(2., 1.8, 1.5) * sun, 1.);
+      }`,
+  });
+  const s = new THREE.Mesh(new THREE.SphereGeometry(90, 48, 24), m);
+  s.position.z = ZOPEN; scene.add(s);
+}
+
+// light shafts falling in through the opening
+function shafts(scene) {
+  const m = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { uTime: { value: 0 }, uFlow: { value: 0 } },
+    vertexShader: `varying float vAlong; varying vec3 vP; void main() { vAlong = position.y; vP = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: `uniform float uTime, uFlow; varying float vAlong; varying vec3 vP;
+      void main() {
+        float along = clamp(vAlong / 9. + .5, 0., 1.);   // 1 at the opening, 0 towards the camera
+        float a = atan(vP.x, vP.z);
+        float rays = .55 + .45 * sin(a * 23. + uTime * .3) * sin(a * 7. - uTime * .2);
+        float k = along * along * rays * (.05 + .03 * abs(uFlow));
+        gl_FragColor = vec4(vec3(1., .93, .8) * k, 1.);
+      }`,
+  });
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(2.0, .9, 9, 64, 1, true), m);
+  cone.rotation.x = -Math.PI / 2; cone.position.set(.2, .1, ZOPEN + 4.6);
+  scene.add(cone);
+  return m.uniforms;
+}
+
+// dust, pollen and warm mist, as soft points that blur when out of focus
+function particles(scene, N, mist, maxSize = 90) {
+  const g = new THREE.BufferGeometry();
+  const P = new Float32Array(N * 3), S = new Float32Array(N), A = new Float32Array(N), C = new Float32Array(N * 3);
+  g.setAttribute("position", new THREE.BufferAttribute(P, 3)); g.setAttribute("aSize", new THREE.BufferAttribute(S, 1));
+  g.setAttribute("aAlpha", new THREE.BufferAttribute(A, 1)); g.setAttribute("aColor", new THREE.BufferAttribute(C, 3));
+  const m = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: mist ? THREE.NormalBlending : THREE.AdditiveBlending,
+    uniforms: { uScale: { value: 800 }, uFocus: { value: 7 }, uAperture: { value: mist ? 0 : 2.2 } },
+    vertexShader: `attribute float aSize, aAlpha; attribute vec3 aColor; uniform float uScale, uFocus, uAperture;
+      varying float vAlpha, vBlur; varying vec3 vColor;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.); float d = max(-mv.z, .05);
+        float coc = clamp(abs(d - uFocus) / d * uAperture * 4., 0., 14.);
+        gl_PointSize = min(aSize * uScale / d + coc, ${maxSize.toFixed(1)});
+        vAlpha = aAlpha / (1. + coc * .3) * smoothstep(.4, 2., d);  // out of focus, and gone right at the lens
+        vBlur = clamp(coc / gl_PointSize * 1.6, 0., 1.); vColor = aColor;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `varying float vAlpha, vBlur; varying vec3 vColor;
+      void main() {
+        float r = length(gl_PointCoord - .5) * 2.;
+        float a = vAlpha * (1. - smoothstep(mix(.35, .05, vBlur), 1., r));
+        if (a < .002) discard;
+        gl_FragColor = vec4(vColor * (${mist ? "1." : "a"}), ${mist ? "a" : "1."});
+      }`,
+  });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; scene.add(pts);
+  const items = Array.from({ length: N }, () => ({ on: false }));
+  let lg = null, LP = null, LC = null;
+  if (!mist) {  // motion streaks: a faint line behind every grain, so the wind shows
+    lg = new THREE.BufferGeometry(); LP = new Float32Array(N * 6); LC = new Float32Array(N * 6);
+    lg.setAttribute("position", new THREE.BufferAttribute(LP, 3)); lg.setAttribute("color", new THREE.BufferAttribute(LC, 3));
+    const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    lines.frustumCulled = false; scene.add(lines);
+  }
+  return { g, m, P, S, A, C, items, N, lg, LP, LC };
+}
+
+// a Demodex mite: a long, ringed, translucent body, four pairs of stubby legs near the front, rearing up
+// to face the opening. Its body is rebuilt every frame along a moving spine.
+function mite() {
+  const S = 90, R = 22, g = new THREE.BufferGeometry(), pos = new Float32Array((S + 1) * (R + 1) * 3), idx = [];
+  for (let j = 0; j < S; j++) for (let i = 0; i < R; i++) {
+    const a = j * (R + 1) + i, b = a + R + 1;
+    idx.push(a, a + 1, b, b, a + 1, b + 1);
+  }
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(idx);
+  const mat = new THREE.MeshPhysicalMaterial({ color: 0xcfa46a, roughness: .5, clearcoat: .5, clearcoatRoughness: .3,
+    sheen: .8, sheenColor: new THREE.Color(0xffc98a), transparent: true, opacity: .9, emissive: 0x3a1d06, envMapIntensity: .2 });
+  const body = new THREE.Mesh(g, mat); body.castShadow = true;
+  const group = new THREE.Group(); group.add(body);
+  const legGeo = new THREE.CapsuleGeometry(.032, .09, 4, 8), legs = [];
+  for (let i = 0; i < 8; i++) { const l = new THREE.Mesh(legGeo, mat); l.castShadow = true; legs.push(l); group.add(l); }
+  const radius = s => {  // s: 0 tail tip .. 1 front
+    const tip = Math.sqrt(Math.max(0, 1 - ((s - .025) / .025) ** 2 * (s < .025)));
+    if (s > .9) return .13 * Math.sqrt(Math.max(0, 1 - ((s - .9) / .1) ** 2));  // mouthparts, narrower
+    const front = s > .58 ? .18 : .18 * (.3 + .7 * smooth(0, .58, s));
+    const rings = s < .6 ? 1 + .08 * Math.max(0, Math.sin(s * 110)) : 1;
+    return front * rings * (s < .025 ? tip : 1);
+  };
+  const T = new THREE.Vector3(), side = new THREE.Vector3(), nrm = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion();
+  let curve;
+  function update(t, flow) {
+    const w = Math.abs(flow);
+    curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(.2 * Math.sin(t * 1.1) + .3 * flow * Math.sin(t * 5), .1, 1.0),
+      new THREE.Vector3(.1 * Math.sin(t * 1.1 + 1), .12, .5),
+      new THREE.Vector3(0, .16, 0),
+      new THREE.Vector3(.05 * Math.sin(t * .9), .62 - .04 * w, -.32 + .14 * flow),
+      new THREE.Vector3(.09 * Math.sin(t * .7), 1.12 - .08 * w, -.5 + .24 * flow),
+    ]);
+    for (let j = 0; j <= S; j++) {
+      const s = j / S, p = curve.getPointAt(s), r = radius(s);
+      curve.getTangentAt(s, T);
+      side.copy(X).addScaledVector(T, -T.dot(X)).normalize(); nrm.crossVectors(T, side);
+      for (let i = 0; i <= R; i++) {
+        const a = i / R * 2 * Math.PI, o = (j * (R + 1) + i) * 3, c = Math.cos(a) * r, sn2 = Math.sin(a) * r;
+        pos[o] = p.x + side.x * c + nrm.x * sn2; pos[o + 1] = p.y + side.y * c + nrm.y * sn2; pos[o + 2] = p.z + side.z * c + nrm.z * sn2;
+      }
+    }
+    g.attributes.position.needsUpdate = true; g.computeVertexNormals();
+    legs.forEach((l, i) => {
+      const s = .64 + Math.floor(i / 2) * .065, k = i % 2 ? 1 : -1, p = curve.getPointAt(s);
+      curve.getTangentAt(s, T); side.copy(X).addScaledVector(T, -T.dot(X)).normalize(); nrm.crossVectors(T, side);
+      const d = side.clone().multiplyScalar(k * .55).addScaledVector(nrm, -.6).addScaledVector(T, .3 + .35 * Math.sin(t * 5 + i * 1.3) * (.4 + w)).normalize();
+      l.position.copy(p).addScaledVector(d, radius(s) + .03);
+      l.quaternion.copy(q.setFromUnitVectors(up, d));
+    });
+  }
+  // a point on its skin facing the way in, for dust that sticks
+  const surface = (u, v) => {
+    const s = .62 + .3 * u, p = curve.getPointAt(s); curve.getTangentAt(s, T);
+    side.copy(X).addScaledVector(T, -T.dot(X)).normalize(); nrm.crossVectors(T, side);
+    const a = Math.PI + v * 1.2, r = radius(s) * 1.05;
+    return p.clone().addScaledVector(side, Math.cos(a) * r * .4).addScaledVector(nrm, Math.sin(a) * r).add(new THREE.Vector3(0, 0, -r * .7));
+  };
+  return { group, update, surface };
+}
+
+// verlet points for hair, beard and the standard: P now, Q a step ago, pinned points never move,
+// distance constraints C/L, and an optional pull back towards a rest shape R (mem per point)
+function verlet(n) {
+  return { n, P: new Float32Array(n * 3), Q: new Float32Array(n * 3), W: new Float32Array(n * 3),
+           pin: new Uint8Array(n), mem: new Float32Array(n), R: null, C: [], L: [] };
+}
+function vLink(v, a, b) { v.C.push(a, b); v.L.push(Math.hypot(v.P[b * 3] - v.P[a * 3], v.P[b * 3 + 1] - v.P[a * 3 + 1], v.P[b * 3 + 2] - v.P[a * 3 + 2])); }
+function vStep(v, h, kd, iters, collide) {  // W holds the wind at every point; drag pulls each point's speed towards it
+  const { n, P, Q, W, pin, mem, R, C, L } = v;
+  for (let i = 0; i < n * 3; i++) {
+    if (pin[(i / 3) | 0]) continue;
+    const vel = (P[i] - Q[i]) / h, a = (i % 3 === 1 ? -9.8 : 0) + kd * (W[i] - vel);
+    Q[i] = P[i]; P[i] += vel * h * .995 + a * h * h;
+  }
+  if (R) for (let i = 0; i < n * 3; i++) P[i] += (R[i] - P[i]) * mem[(i / 3) | 0];
+  for (let it = 0; it < iters; it++) {
+    for (let c = 0; c < L.length; c++) {
+      const ia = C[2 * c], ib = C[2 * c + 1], a = ia * 3, b = ib * 3, wa = pin[ia] ? 0 : 1, wb = pin[ib] ? 0 : 1;
+      if (!(wa + wb)) continue;
+      const dx = P[b] - P[a], dy = P[b + 1] - P[a + 1], dz = P[b + 2] - P[a + 2], d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-6;
+      const s = (d - L[c]) / d / (wa + wb);
+      P[a] += dx * s * wa; P[a + 1] += dy * s * wa; P[a + 2] += dz * s * wa;
+      P[b] -= dx * s * wb; P[b + 1] -= dy * s * wb; P[b + 2] -= dz * s * wb;
+    }
+    if (collide) collide(P, pin, n);
+  }
+}
+
+function knightTextures() {
+  // mail: rows of small overlapping rings, as a normal map
+  const NW = 256, NH = 256, h = new Float32Array(NW * NH);
+  for (let j = 0; j < NH; j++) for (let i = 0; i < NW; i++) {
+    let m = 0;
+    for (const [ox, oy] of [[0, 0], [8, 8]]) {
+      const x = ((i + ox) % 16) - 8, y = ((j + oy) % 16) - 8, r = Math.hypot(x, y * 1.15);
+      m = Math.max(m, Math.exp(-((r - 5.2) ** 2) / 2.2));
+    }
+    h[j * NW + i] = m;
+  }
+  const nd = new Uint8Array(NW * NH * 4);
+  for (let j = 0; j < NH; j++) for (let i = 0; i < NW; i++) {
+    const dx = h[j * NW + (i + 1) % NW] - h[j * NW + (i + NW - 1) % NW], dy = h[((j + 1) % NH) * NW + i] - h[((j + NH - 1) % NH) * NW + i];
+    const nx = -dx * 2.5, ny = -dy * 2.5, l = Math.hypot(nx, ny, 1), o = (j * NW + i) * 4;
+    nd[o] = (nx / l * .5 + .5) * 255; nd[o + 1] = (ny / l * .5 + .5) * 255; nd[o + 2] = (1 / l * .5 + .5) * 255; nd[o + 3] = 255;
+  }
+  const mail = new THREE.DataTexture(nd, NW, NH, THREE.RGBAFormat);
+  mail.wrapS = mail.wrapT = THREE.RepeatWrapping; mail.repeat.set(10, 8); mail.needsUpdate = true;
+  // a gold heart with a pulse line through it, the emblem on the surcoat and the standard
+  const heart = (g, x, y, s) => {
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.beginPath(); g.moveTo(0, .35);
+    g.bezierCurveTo(-.1, .2, -.55, .05, -.5, -.25); g.bezierCurveTo(-.45, -.5, -.1, -.5, 0, -.25);
+    g.bezierCurveTo(.1, -.5, .45, -.5, .5, -.25); g.bezierCurveTo(.55, .05, .1, .2, 0, .35);
+    g.fillStyle = "#d8ac4a"; g.fill(); g.lineWidth = .03; g.strokeStyle = "#6b4a14"; g.stroke();
+    g.beginPath(); g.moveTo(-.62, -.05); g.lineTo(-.25, -.05); g.lineTo(-.15, -.28); g.lineTo(-.02, .2); g.lineTo(.1, -.12); g.lineTo(.18, -.05); g.lineTo(.62, -.05);
+    g.lineWidth = .045; g.strokeStyle = "#5a0c12"; g.lineJoin = "round"; g.stroke();
+    g.restore();
+  };
+  const weave = (g, W, H) => {  // fabric grain
+    for (let i = 0; i < 2500; i++) {
+      g.fillStyle = `rgba(${Math.random() < .5 ? "0,0,0" : "255,220,200"},${rnd(.02, .06).toFixed(3)})`;
+      g.fillRect(Math.random() * W, Math.random() * H, rnd(2, 30), 1);
+    }
+  };
+  const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+  let g = c.getContext("2d");
+  g.fillStyle = "#7e1520"; g.fillRect(0, 0, 512, 256); weave(g, 512, 256);
+  g.fillStyle = "#c79a3e"; g.fillRect(0, 218, 512, 8);  // hem
+  heart(g, 256, 70, 95);  // front, at the chest (u = .5 faces forward)
+  const coat = new THREE.CanvasTexture(c); coat.colorSpace = THREE.SRGBColorSpace;
+  // the standard: crimson with a gold border and three swallow tails, cut out by alpha
+  const f = document.createElement("canvas"); f.width = 256; f.height = 512;
+  g = f.getContext("2d");
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(256, 0); g.lineTo(256, 430);
+  for (const [tx, bx] of [[213, 171], [128, 85], [43, 0]]) { g.lineTo(tx, 512); g.lineTo(bx, 400); }
+  g.lineTo(0, 512); g.closePath();
+  g.save(); g.clip();
+  g.fillStyle = "#8e1420"; g.fillRect(0, 0, 256, 512); weave(g, 256, 512);
+  g.lineWidth = 14; g.strokeStyle = "#c99a3c"; g.stroke();
+  g.fillStyle = "#c99a3c"; g.fillRect(0, 0, 256, 26);
+  heart(g, 128, 190, 150);
+  g.restore();
+  const flag = new THREE.CanvasTexture(f); flag.colorSpace = THREE.SRGBColorSpace;
+  return { mail, coat, flag };
+}
+
+// a medieval knight: mail under a crimson surcoat with the heart, steel pauldrons, a sword at his hip,
+// long hair and a long beard, and a standard on a lance. Built from primitives, facing +z, feet at the
+// origin, 1.8 tall. Hair, beard and standard are verlet strands and cloth, blown by the breath's current
+// like the dust: towards you on the inhale, out towards the opening on the exhale.
+function knight(turn) {
+  const group = new THREE.Group(), tex = knightTextures(), V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const mail = new THREE.MeshStandardMaterial({ color: 0x8f949b, metalness: .85, roughness: .42, normalMap: tex.mail, normalScale: new THREE.Vector2(1.2, 1.2) });
+  const steel = new THREE.MeshPhysicalMaterial({ color: 0xc2c6cc, metalness: 1, roughness: .26, clearcoat: .4 });
+  const coat = new THREE.MeshStandardMaterial({ map: tex.coat, roughness: .82, side: THREE.DoubleSide });
+  const leather = new THREE.MeshStandardMaterial({ color: 0x3e2617, roughness: .62 });
+  const skin = new THREE.MeshPhysicalMaterial({ color: 0xc08a6e, roughness: .55, sheen: .3 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x5b3b22, roughness: .6 });
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a14a, metalness: 1, roughness: .3 });
+  for (const m of [mail, steel, coat, leather, skin, wood, gold]) m.envMapIntensity = m.metalness ? .35 : .12;
+  const add = (geo, mat, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; group.add(m); return m;
+  };
+  const limb = (a, b, r, mat) => {  // a capsule from a to b
+    const d = b.clone().sub(a), m = add(new THREE.CapsuleGeometry(r, d.length(), 6, 12), mat);
+    m.position.copy(a).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); return m;
+  };
+  const lathe = (pts, mat) => {
+    const m = add(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 40), mat);
+    m.scale.set(1.15, 1, .8); m.rotation.y = Math.PI; return m;  // the seam at the back
+  };
+  for (const s of [-1, 1]) {  // legs in mail, boots
+    limb(V(.11 * s, .3, 0), V(.1 * s, .85, 0), .075, mail);
+    limb(V(.11 * s, .1, 0), V(.11 * s, .4, 0), .082, leather);
+    limb(V(.11 * s, .06, -.03), V(.11 * s, .05, .13), .06, leather);
+  }
+  const torso = [
+    lathe([[.27, .42], [.26, .6], [.22, .85], [.2, 1], [.235, 1.18], [.24, 1.3], [.2, 1.4], [.1, 1.47], [.06, 1.5]], mail),
+    lathe([[.29, .47], [.275, .62], [.228, .86], [.208, 1], [.243, 1.18], [.247, 1.3], [.21, 1.38]], coat),
+  ];
+  const belt = add(new THREE.TorusGeometry(.212, .022, 8, 40), leather, 0, 1, 0);
+  belt.rotation.x = Math.PI / 2; belt.scale.set(1.15, .8, 1);
+  add(new THREE.BoxGeometry(.06, .05, .02), gold, 0, 1, .18);
+  for (const s of [-1, 1]) {  // pauldrons
+    const p = add(new THREE.SphereGeometry(.11, 20, 10, 0, 2 * Math.PI, 0, Math.PI / 2), steel, .25 * s, 1.36, 0);
+    p.rotation.z = -.5 * s; p.scale.set(1, .8, 1.1);
+  }
+  // right arm holds the lance, left hand rests on the sword
+  limb(V(-.27, 1.34, 0), V(-.33, 1.1, .08), .06, mail); limb(V(-.33, 1.1, .08), V(-.33, 1.13, .27), .052, leather);
+  add(new THREE.SphereGeometry(.052, 12, 10), leather, -.33, 1.13, .3);
+  limb(V(.27, 1.34, 0), V(.31, 1.08, -.02), .06, mail); limb(V(.31, 1.08, -.02), V(.24, .99, .1), .052, leather);
+  add(new THREE.SphereGeometry(.05, 12, 10), leather, .23, .98, .12);
+  limb(V(.25, .93, .1), V(.32, .3, -.14), .028, leather);  // scabbard
+  const guard = add(new THREE.BoxGeometry(.17, .022, .03), steel, .245, .955, .1); guard.rotation.z = .1;
+  add(new THREE.SphereGeometry(.025, 10, 8), gold, .225, 1.07, .14);
+  // neck and head
+  limb(V(0, 1.42, 0), V(0, 1.55, .01), .055, skin);
+  const HC = V(0, 1.64, .01), HR = V(.097, .116, .106);
+  add(new THREE.SphereGeometry(1, 28, 20), skin, HC.x, HC.y, HC.z).scale.copy(HR);
+  const nose = add(new THREE.ConeGeometry(.018, .055, 10), skin, 0, 1.635, .12); nose.rotation.x = Math.PI / 2 + .35;
+  for (const s of [-1, 1]) {
+    add(new THREE.SphereGeometry(.011, 8, 6), new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: .2 }), .036 * s, 1.67, .094);
+    const brow = add(new THREE.BoxGeometry(.04, .009, .012), leather, .036 * s, 1.69, .099); brow.rotation.z = -.15 * s;
+  }
+  // the lance: an ash shaft, a steel head, and a crossbar the standard hangs from. The crossbar runs
+  // left to right on screen whatever way the knight turns, so the standard faces you.
+  const L0 = V(-.33, 0, .3), bar = V(Math.cos(turn), 0, Math.sin(turn)), TOP = 2.95, FW = .66, FH = 1.02;
+  add(new THREE.CylinderGeometry(.018, .022, 3.16, 10), wood, L0.x, 1.58, L0.z);
+  add(new THREE.ConeGeometry(.032, .2, 4), steel, L0.x, 3.26, L0.z);
+  const cross = add(new THREE.CylinderGeometry(.011, .011, FW + .08, 8), wood, L0.x, TOP, L0.z);
+  cross.quaternion.setFromUnitVectors(V(0, 1, 0), bar);
+  for (const s of [-1, 1]) add(new THREE.SphereGeometry(.022, 10, 8), gold, L0.x + bar.x * s * (FW / 2 + .04), TOP, L0.z + bar.z * s * (FW / 2 + .04));
+
+  // hair and beard: strands rooted on the head, settled once under gravity, then remembered as the
+  // shape they spring back to
+  const strands = [], SEG = 10;
+  const root = (hair) => {
+    for (;;) {
+      const d = V(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)); if (d.lengthSq() > 1 || d.lengthSq() < .01) continue; d.normalize();
+      if (hair ? d.y > -.25 && (d.y > .45 || d.z < .3) : d.z > .25 && d.y < -.1 && d.y > -.95) return d;  // hairline above the brow
+    }
+  };
+  for (let s = 0; s < 420; s++) {
+    const hair = s < 250, d = root(hair), len = hair ? rnd(.5, .75) : rnd(.28, .46) * (1 - .4 * Math.abs(d.x));
+    const grey = Math.random() < (hair ? .15 : .3);
+    strands.push({ d, len, hair, w: hair ? rnd(.016, .026) : rnd(.013, .02),
+                   col: new THREE.Color(grey ? 0xa49c92 : hair ? 0x6b4026 : 0x75502f).multiplyScalar(rnd(.8, 1.2)), seed: rnd(0, 99) });
+  }
+  const hv = verlet(strands.length * SEG);
+  strands.forEach((st, s) => {
+    for (let j = 0; j < SEG; j++) {
+      const i = s * SEG + j, o = i * 3, p = V(HC.x + st.d.x * HR.x, HC.y + st.d.y * HR.y, HC.z + st.d.z * HR.z).addScaledVector(st.d, j * st.len / (SEG - 1) * .4);
+      p.y -= j * st.len / (SEG - 1) * .6;
+      hv.P[o] = hv.Q[o] = p.x; hv.P[o + 1] = hv.Q[o + 1] = p.y; hv.P[o + 2] = hv.Q[o + 2] = p.z;
+      hv.pin[i] = j === 0 ? 1 : 0;
+      if (j) vLink(hv, i - 1, i);
+    }
+    for (let j = 2; j < SEG; j++) vLink(hv, s * SEG + j - 2, s * SEG + j);  // a little stiffness
+  });
+  hv.C = new Int32Array(hv.C); hv.L = new Float32Array(hv.L);
+  const NH = strands.filter(st => st.hair).length * SEG;
+  const collide = (P, pin, n) => {
+    for (let i = 0; i < n; i++) {
+      if (pin[i]) continue;
+      const o = i * 3;
+      if (i < NH && P[o + 2] > HC.z && P[o + 1] > 1.5 && P[o + 1] < 1.74 && Math.abs(P[o]) < .125)  // hair frames the face, never covers it
+        P[o] = P[o] < 0 ? -.125 : .125;
+      const x = (P[o] - HC.x) / HR.x, y = (P[o + 1] - HC.y) / HR.y, z = (P[o + 2] - HC.z) / HR.z, e = Math.sqrt(x * x + y * y + z * z);
+      if (e < 1.08) { const k = 1.08 / e; P[o] = HC.x + x * k * HR.x; P[o + 1] = HC.y + y * k * HR.y; P[o + 2] = HC.z + z * k * HR.z; }
+      const yy = P[o + 1];
+      if (yy > .4 && yy < 1.5) {  // chest, back and shoulders
+        const rx = yy > 1.43 ? .12 : .31, rz = yy > 1.43 ? .1 : .215, f = Math.hypot(P[o] / rx, P[o + 2] / rz);
+        if (f < 1) { P[o] /= f; P[o + 2] /= f; }
+      }
+    }
+  };
+  for (let k = 0; k < 240; k++) vStep(hv, 1 / 120, 3, 2, collide);
+  hv.R = hv.P.slice();
+  strands.forEach((st, s) => { for (let j = 1; j < SEG; j++) hv.mem[s * SEG + j] = .03 * (1 - j / SEG) ** 2; });
+
+  // the strands drawn as ribbons turned towards the camera, tapering to the tips
+  const NV = strands.length * SEG * 2, rg = new THREE.BufferGeometry(), RP = new Float32Array(NV * 3), RN = new Float32Array(NV * 3), RC = new Float32Array(NV * 3), ri = [];
+  strands.forEach((st, s) => {
+    for (let j = 0; j < SEG; j++) {
+      const v = (s * SEG + j) * 2, tip = j / (SEG - 1), c = st.col.clone().multiplyScalar(.85 + .35 * tip);
+      for (const k of [0, 1]) RC.set([c.r, c.g, c.b], (v + k) * 3);
+      if (j < SEG - 1) ri.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
+    }
+  });
+  rg.setAttribute("position", new THREE.BufferAttribute(RP, 3)); rg.setAttribute("normal", new THREE.BufferAttribute(RN, 3));
+  rg.setAttribute("color", new THREE.BufferAttribute(RC, 3)); rg.setIndex(ri);
+  const ribbons = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .5, side: THREE.DoubleSide, envMapIntensity: .12 }));
+  ribbons.castShadow = true; ribbons.frustumCulled = false; group.add(ribbons);
+
+  // the standard: a cloth grid pinned along the crossbar
+  const NX = 11, NY = 17, fv = verlet(NX * NY), fg = new THREE.PlaneGeometry(1, 1, NX - 1, NY - 1);
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    const k = j * NX + i, o = k * 3, u = i / (NX - 1) - .5;
+    fv.P[o] = fv.Q[o] = L0.x + bar.x * u * FW; fv.P[o + 1] = fv.Q[o + 1] = TOP - .02 - j / (NY - 1) * FH; fv.P[o + 2] = fv.Q[o + 2] = L0.z + bar.z * u * FW;
+    fv.pin[k] = j === 0 ? 1 : 0;
+    if (i) vLink(fv, k - 1, k);
+    if (j) vLink(fv, k - NX, k);
+    if (i && j) { vLink(fv, k - NX - 1, k); vLink(fv, k - NX, k - 1); }
+  }
+  fv.C = new Int32Array(fv.C); fv.L = new Float32Array(fv.L);
+  const flag = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ map: tex.flag, roughness: .78, side: THREE.DoubleSide, alphaTest: .5, envMapIntensity: .15 }));
+  flag.castShadow = true; flag.frustumCulled = false; group.add(flag);
+
+  const q = new THREE.Quaternion(), w = new THREE.Vector3(), cam = new THREE.Vector3();
+  function update(t, dt, flow, level, camera) {
+    // the current at the guardian, in his own frame: along the passage, and spreading out from the
+    // opening on the inhale (he stands left of it) or gathering back into it on the exhale
+    group.updateWorldMatrix(true, false); group.getWorldQuaternion(q).invert();
+    const gust = 1 + .3 * n3(t * .7, 5, 0);
+    w.set(-3.2 * flow * gust + .8 * n3(t * .5, 7, 0) * (.3 + Math.abs(flow)), .3 * n3(t * .6, 8, 0) * Math.abs(flow), 8 * flow * gust).applyQuaternion(q);
+    cam.copy(camera.position); group.worldToLocal(cam);
+    strands.forEach((st, s) => {
+      const tb = 1 + .45 * Math.sin(t * 7 + st.seed) * Math.abs(flow) + .25 * n3(st.seed, t * 1.3, 0);
+      for (let j = 0; j < SEG; j++) {
+        const o = (s * SEG + j) * 3, fl = .4 * Math.sin(t * 15 + st.seed + j) * Math.abs(flow) * j / SEG;
+        hv.W[o] = w.x * tb + fl; hv.W[o + 1] = w.y * tb + fl; hv.W[o + 2] = w.z * tb;
+      }
+    });
+    for (let k = 0; k < NX * NY; k++) {
+      const o = k * 3, i = k % NX, j = (k / NX) | 0, tf = (.5 + 2 * Math.abs(flow));
+      fv.W[o] = w.x + tf * n3(i * .25, j * .25, t * 1.6); fv.W[o + 1] = w.y + .5 * tf * n3(i * .25 + 9, j * .25, t * 1.6); fv.W[o + 2] = w.z + tf * n3(i * .25, j * .25 + 9, t * 1.6);
+    }
+    const n = Math.min(4, Math.ceil(Math.min(dt, 1 / 20) * 120)), h = Math.min(dt, 1 / 20) / n;
+    for (let k = 0; k < n; k++) { vStep(hv, h, 3, 2, collide); vStep(fv, h, 2.2, 3, null); }
+    // ribbons
+    const P = hv.P;
+    strands.forEach((st, s) => {
+      for (let j = 0; j < SEG; j++) {
+        const i = s * SEG + j, o = i * 3, a = (j ? i - 1 : i) * 3, b = (j < SEG - 1 ? i + 1 : i) * 3;
+        let tx = P[b] - P[a], ty = P[b + 1] - P[a + 1], tz = P[b + 2] - P[a + 2];
+        const ex = cam.x - P[o], ey = cam.y - P[o + 1], ez = cam.z - P[o + 2];
+        let sx = ty * ez - tz * ey, sy = tz * ex - tx * ez, sz = tx * ey - ty * ex, sl = Math.hypot(sx, sy, sz) || 1;
+        const wd = st.w * (1 - .75 * j / (SEG - 1)) / sl; sx *= wd; sy *= wd; sz *= wd;
+        const v = i * 6;
+        RP[v] = P[o] - sx; RP[v + 1] = P[o + 1] - sy; RP[v + 2] = P[o + 2] - sz;
+        RP[v + 3] = P[o] + sx; RP[v + 4] = P[o + 1] + sy; RP[v + 5] = P[o + 2] + sz;
+        const el = Math.hypot(ex, ey, ez) || 1;
+        RN[v] = RN[v + 3] = ex / el; RN[v + 1] = RN[v + 4] = ey / el + .3; RN[v + 2] = RN[v + 5] = ez / el;
+      }
+    });
+    rg.attributes.position.needsUpdate = true; rg.attributes.normal.needsUpdate = true;
+    fg.attributes.position.array.set(fv.P); fg.attributes.position.needsUpdate = true; fg.computeVertexNormals();
+    // breathing: the chest fills with the guide
+    for (const m of torso) { m.scale.x = 1.15 * (1 + .025 * level); m.scale.z = .8 * (1 + .04 * level); }
+  }
+  return { group, update };
+}
+
+let S = null;  // the whole scene, made on first use
+function init(canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture;
+  const camera = new THREE.PerspectiveCamera(50, 1, .05, 300);
+  scene.add(tunnel()); sky(scene);
+  const hairU = hairs(scene), shaftU = shafts(scene);
+  // daylight through the opening, a dim warm fill, and the pulse glow behind you
+  const sun = new THREE.SpotLight(0xfff0dc, 12, 40, .62, 1, 1.2);
+  sun.position.set(.4, .5, ZOPEN - 3); sun.target.position.set(0, -.4, 2);
+  sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -.0004; sun.shadow.radius = 4;
+  scene.add(sun, sun.target);
+  const fill = new THREE.HemisphereLight(0xffd2c4, 0x2a0608, .12); scene.add(fill);
+  const pulse = new THREE.PointLight(0xff2a20, 0, 10, 1.4); pulse.position.set(0, 0, 2.6); scene.add(pulse);
+  const dust = particles(scene, 3400, false), mist = particles(scene, 160, true);
+  const guard = new THREE.Group(); guard.position.set(GX, floorY(ZG), ZG); scene.add(guard);
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), .45, .6, .9);
+  composer.addPass(bloom);
+  const grade = new ShaderPass(GRADE);
+  composer.addPass(grade); composer.addPass(new OutputPass());
+  S = { renderer, scene, camera, composer, bloom, grade, hairU, shaftU, sun, pulse, dust, mist, guard,
+        kind: null, model: null, mixer: null, mite: null, knight: null, catcher: null, stuck: [], spawn: 0, mspawn: 0, hspawn: 0, hairV: 0, wspawn: 0, held: 0, w: 0, h: 0 };
+}
+const GRADE = {  // the last pass: a vignette and a little film grain
+    uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; varying vec2 vUv;
+      void main() {
+        vec4 c = texture2D(tDiffuse, vUv);
+        float d = distance(vUv, vec2(.5)); c.rgb *= mix(1., .25, smoothstep(.3, .85, d));   // vignette
+        float n = fract(sin(dot(vUv * 1000. + uTime, vec2(12.9898, 78.233))) * 43758.5453); c.rgb += (n - .5) * .03;  // grain
+        gl_FragColor = c;
+      }`,
+};
+
+function setGuard(kind) {
+  S.kind = kind;
+  S.guard.clear(); S.mixer = null; S.mite = null; S.knight = null; S.catcher = null;
+  S.guard.position.set(GX, floorY(ZG), ZG);
+  for (const it of S.stuck) it.on = false;
+  S.stuck = [];
+  if (kind === "mite") {
+    S.mite = mite(); S.mite.group.scale.setScalar(1.25); S.guard.add(S.mite.group);
+  } else if (kind === "knight") {  // nearer, turned three quarters towards you: the inhale blows his hair and beard at you
+    const turn = .5, target = (tunnelR(Math.PI / 2, KZ)[1] - floorY(KZ)) / 3;
+    S.knight = knight(turn); S.knight.group.rotation.y = turn; S.knight.group.scale.setScalar(target / 1.8);
+    S.guard.position.set(GX + .15, floorY(KZ), KZ); S.guard.add(S.knight.group); S.height = target;
+  } else if (MODELS[kind]) {
+    new GLTFLoader().load(MODEL_URL + MODELS[kind], gltf => {
+      if (S.kind !== kind) return;
+      const m = gltf.scene;
+      m.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(m, true);
+      let hgt = box.max.y - box.min.y;
+      if (!(hgt > .5 && hgt < 5)) hgt = 1.8;  // the three.js example figures are about 1.8 units tall
+      const target = (tunnelR(Math.PI / 2, ZG)[1] - floorY(ZG)) / 3;  // a third of the passage
+      m.scale.setScalar(target / hgt);  // the figures face -z: back to us, towards the opening
+      m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      S.guard.add(m);
+      S.mixer = new THREE.AnimationMixer(m);
+      const idle = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
+      if (idle) S.mixer.clipAction(idle).play();
+      S.height = target;
+    }, undefined, e => console.warn("nose guardian model:", e));
+  }
+}
+
+function frame(canvas, t, dt, flow, o) {
+  if (!S) init(canvas);
+  const { renderer, camera, composer, dust, mist } = S, w = canvas.clientWidth, h = canvas.clientHeight;
+  if (w !== S.w || h !== S.h) {
+    S.w = w; S.h = h; renderer.setSize(w, h, false); composer.setSize(w, h);
+    camera.aspect = w / h; camera.fov = 50 + 28 * Math.max(0, 1 - w / h); camera.updateProjectionMatrix();  // wider on a phone held upright
+    const s = h * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360));
+    dust.m.uniforms.uScale.value = s; mist.m.uniforms.uScale.value = s;
+  }
+  const kind = o.guard || "mite";
+  if (kind !== S.kind) setGuard(kind);
+  const wind = Math.abs(flow);
+  // a slow, hand-held drift; with the breath guide the camera glides towards the opening as the lungs
+// fill and back as they empty, and the exposure and daylight swell a little
+  camera.position.set(.35 + .06 * n3(t * .08, 1, 0), .15 + .05 * n3(t * .08, 2, 0), 1.3 - .45 * o.level);
+  camera.lookAt(.2 + .1 * n3(t * .05, 3, 0), -.25, ZOPEN);
+  renderer.toneMappingExposure = 1 + .08 * (o.level - .5);
+  const hb = S.hairU.uBend, d1 = Math.min(dt, .05);  // springy: the hairs whip over and overshoot a little
+  S.hairV += ((flow - hb.value) * 70 - S.hairV * 8) * d1; hb.value += S.hairV * d1;
+  S.hairU.uTime.value = t;
+  S.shaftU.uTime.value = t; S.shaftU.uFlow.value = flow; S.grade.uniforms.uTime.value = t % 100;
+  S.pulse.intensity = 6 * o.beat;
+  S.sun.intensity = 10 + 4 * o.level;
+  // the guardian leans into the inhale, tips back on the exhale
+  S.guard.rotation.x += ((S.mite ? 0 : -.1 * flow) - S.guard.rotation.x) * Math.min(1, dt * 3);
+  if (S.mite) S.mite.update(t, flow);
+  if (S.mixer) S.mixer.update(dt);
+  if (S.knight) S.knight.update(t, dt, flow, o.level, camera);
+  const gp = S.guard.position, ch = S.mite ? 1.2 : (S.height || 1.4) * .6;
+  S.catcher = { x: gp.x, y: gp.y + ch, z: gp.z - .3, r: S.mite ? .55 : .5 };
+  stepDust(t, dt, flow);
+  composer.render(dt);
+}
+
+function stepDust(t, dt, flow) {
+  const { dust, mist } = S, c = S.catcher;
+  const field = (p, it) => {  // the current at p: along the passage, fastest in the middle, with turbulence
+    const [rx, ry] = tunnelR(Math.atan2(p.y, p.x), Math.max(p.z, ZOPEN)), u = Math.min(1, Math.hypot(p.x / rx, p.y / ry));
+    const k = .3 + 1.7 * Math.abs(flow), tt = t * (.25 + .6 * Math.abs(flow));
+    let vx = k * n3(p.x * .35, p.y * .35 + 10, p.z * .35 + tt), vy = k * n3(p.x * .35 + 20, p.y * .35, p.z * .35 + tt);
+    const vz = flow * 7.5 * (1 - .6 * u * u) * (1 + .3 * n3(p.x * .6, p.y * .6, t * .7));
+    if (p.z < ZOPEN) { vx -= p.x * .35 * flow; vy -= p.y * .35 * flow; }  // gathered into the opening, or spread out
+    return [vx, vy + (it.kind === "dust" ? -.06 : it.kind === "mist" ? .04 : -.02), vz];
+  };
+  // new air: dust from outside on the inhale, warm mist from behind you on the exhale
+  S.spawn = Math.min(S.spawn + dt * (flow > 0 ? 650 * flow : 0), 12);
+  for (let i = 0; S.spawn >= 1 && i < dust.N; i++) if (!dust.items[i].on) {
+    S.spawn--;
+    const a = rnd(0, 6.3), r = Math.sqrt(Math.random()) * 1.9, kind = Math.random() < .8 ? "dust" : Math.random() < .6 ? "pollen" : "fiber";
+    dust.items[i] = { on: true, kind, p: new THREE.Vector3(r * Math.cos(a) * 1.3, r * Math.sin(a), rnd(-21, ZOPEN - .5)), v: new THREE.Vector3(),
+                      size: kind === "pollen" ? rnd(.035, .055) : rnd(.012, .03), alpha: rnd(.5, 1), tw: rnd(0, 9) };
+  }
+  // the exhale shakes loose dust out of the hairs
+  S.hspawn = Math.min(S.hspawn + dt * (flow < -.15 ? 160 * -flow : 0), 6);
+  for (let i = 0; S.hspawn >= 1 && i < dust.N; i++) if (!dust.items[i].on) {
+    S.hspawn--;
+    const a = rnd(0, 6.3), z = rnd(-13.3, -9.2), [rx, ry] = tunnelR(a, z), e = rnd(.72, .86);
+    dust.items[i] = { on: true, kind: "dust", p: new THREE.Vector3(rx * Math.cos(a) * e, ry * Math.sin(a) * e, z), v: new THREE.Vector3(0, 0, -2),
+                      size: rnd(.012, .03), alpha: rnd(.5, 1), tw: rnd(0, 9) };
+  }
+  // wisps: faint threads of moving air, seen only as streaks
+  S.wspawn = Math.min(S.wspawn + dt * 90 * Math.abs(flow), 4);
+  for (let i = 0; S.wspawn >= 1 && i < dust.N; i++) if (!dust.items[i].on) {
+    S.wspawn--;
+    const a = rnd(0, 6.3), r = Math.sqrt(Math.random()) * .8, z = flow > 0 ? rnd(-15, -8) : rnd(-6, 1);
+    dust.items[i] = { on: true, kind: "wisp", p: new THREE.Vector3(r * Math.cos(a) * 1.3, r * Math.sin(a), z), v: new THREE.Vector3(0, 0, 7 * flow),
+                      size: 0, alpha: rnd(.2, .4), tw: rnd(0, 9), life: 1 };
+  }
+  S.mspawn = Math.min(S.mspawn + dt * (flow < 0 ? 22 * -flow : 0), 3);
+  for (let i = 0; S.mspawn >= 1 && i < mist.N; i++) if (!mist.items[i].on) {
+    S.mspawn--;
+    mist.items[i] = { on: true, kind: "mist", p: new THREE.Vector3(rnd(-1.8, 1.8), rnd(-1.2, 1.2), rnd(1, 3)), v: new THREE.Vector3(),
+                      size: rnd(.5, 1.1), alpha: rnd(.05, .1), life: 1 };
+  }
+  for (const sys of [dust, mist]) {
+    for (let i = 0; i < sys.N; i++) {
+      const it = sys.items[i], o3 = i * 3;
+      if (!it.on) { sys.A[i] = 0; continue; }
+      if (it.held) {  // caught in a hair: trembles with it until the exhale blows it out
+        it.p.x = it.hx + .02 * Math.sin(t * 17 + it.tw); it.p.y = it.hy + .02 * Math.cos(t * 13 + it.tw);
+        it.p.z = it.hz + .5 * S.hairU.uBend.value * it.hk;
+        it.v.set(0, 0, 0);
+        if (flow < -.2 && Math.random() < dt * 3) { it.held = false; S.held--; it.v.set(0, 0, -3); }
+      } else if (it.stuck) {  // stuck on the guardian until the exhale
+        const sp = S.mite ? S.mite.surface(it.su, it.sv) : null;
+        if (sp) it.p.copy(sp).applyMatrix4(S.mite.group.matrixWorld);
+        if (flow < -.25 && Math.random() < dt * 2) it.stuck = false;
+      } else {
+        const [vx, vy, vz] = field(it.p, it), k = Math.min(1, dt * (it.kind === "mist" ? 2.5 : it.kind === "pollen" ? 4 : 7));
+        it.v.x += (vx - it.v.x) * k; it.v.y += (vy - it.v.y) * k; it.v.z += (vz - it.v.z) * k;
+        it.p.addScaledVector(it.v, dt);
+        if (it.p.z > ZOPEN) {  // walls
+          const [rx, ry] = tunnelR(Math.atan2(it.p.y, it.p.x), it.p.z), e = Math.hypot(it.p.x / rx, it.p.y / ry);
+          if (e > .9) it.p.x *= .9 / e, it.p.y *= .9 / e;
+          if (it.kind !== "wisp" && flow > .3 && e > .78 && it.p.z > -13.3 && it.p.z < -9.2 && S.held < 220 && Math.random() < dt * 4) {
+            it.held = true; S.held++; it.hx = it.p.x; it.hy = it.p.y; it.hz = it.p.z; it.hk = rnd(.1, .4);
+          }
+        }
+        if (c && it.kind !== "mist" && flow > .25 && S.stuck.length < 40 && Math.abs(it.p.z - c.z) < .25
+            && Math.hypot(it.p.x - c.x, it.p.y - c.y) < c.r && Math.random() < .35) {
+          it.stuck = true; it.su = Math.random(); it.sv = rnd(-1, 1);
+          if (!S.mite) it.p.set(c.x + rnd(-.25, .25), c.y + rnd(-.4, .4), c.z + .05);
+          S.stuck.push(it);
+        }
+      }
+      if (it.kind === "mist") it.life -= dt * (flow < 0 ? .18 : .5);
+      if (it.kind === "wisp") it.life -= dt * .9;
+      if (it.p.z > 3.2 || it.p.z < -24 || (it.life !== undefined && it.life <= 0)) {
+        if (it.held) S.held--;
+        it.on = false; it.stuck = false; it.held = false; sys.A[i] = 0;
+        if (sys.LC) sys.LC.fill(0, i * 6, i * 6 + 6);
+        continue;
+      }
+      sys.P[o3] = it.p.x; sys.P[o3 + 1] = it.p.y; sys.P[o3 + 2] = it.p.z;
+      sys.S[i] = it.size;
+      // lit by the daylight: bright near the axis and towards the opening, with a twinkle
+      const lit = it.kind === "mist" ? 1 : (.3 + 2.2 * Math.exp(-(it.p.x * it.p.x + it.p.y * it.p.y) / 1.6) * smooth(3, ZOPEN, it.p.z)) * (.75 + .5 * Math.sin(t * 6 + it.tw));
+      const col = it.kind === "pollen" ? [1, .82, .35] : it.kind === "mist" ? [1, .9, .86] : [1, .95, .86];
+      const fade = Math.min(1, (3.2 - it.p.z) / 1.2);
+      sys.A[i] = it.kind === "wisp" ? 0 : it.alpha * (it.kind === "mist" ? it.life : 1) * fade;
+      sys.C[o3] = col[0] * lit; sys.C[o3 + 1] = col[1] * lit; sys.C[o3 + 2] = col[2] * lit;
+      if (sys.LP) {  // the streak: from the grain back along its motion
+        const o6 = i * 6, L = it.kind === "wisp" ? .14 : .065, sp = it.v.length();
+        const k = (it.kind === "wisp" ? it.alpha * Math.sin(Math.PI * it.life) : it.alpha * .9 * Math.min(1, sp / 3)) * fade * lit;
+        sys.LP[o6] = it.p.x; sys.LP[o6 + 1] = it.p.y; sys.LP[o6 + 2] = it.p.z;
+        sys.LP[o6 + 3] = it.p.x - it.v.x * L; sys.LP[o6 + 4] = it.p.y - it.v.y * L; sys.LP[o6 + 5] = it.p.z - it.v.z * L;
+        sys.LC[o6] = col[0] * k; sys.LC[o6 + 1] = col[1] * k; sys.LC[o6 + 2] = col[2] * k;
+        sys.LC[o6 + 3] = sys.LC[o6 + 4] = sys.LC[o6 + 5] = 0;
+      }
+    }
+    if (sys.lg) { sys.lg.attributes.position.needsUpdate = true; sys.lg.attributes.color.needsUpdate = true; }
+    S.stuck = S.stuck.filter(it => it.stuck && it.on);
+    for (const k of ["position", "aSize", "aAlpha", "aColor"]) sys.g.attributes[k].needsUpdate = true;
+  }
+}
+
+// ---- the machine nose: the same breath in a cathedral of iron, dust and steam. Gothic ribs of riveted
+// iron and stained glass; the nostril is a rose window with a turbine behind it that turns with the air;
+// pistons rise as the lungs fill, gears turn around the rose, gauges read the breath and the pulse, steam
+// bursts from the valves on the exhale, clockwork moths fly in the light, and a steam-driven automaton
+// stands guard with a furnace for a heart that glows with your pulse. machine() is called like frame().
+const NAVE = { w: 3.5, floor: -2, spring: 2.5, z0: 3, end: -20.2, rose: 2, R: 2.4 };
+function archProfile(k = 1) {  // the nave's cross-section: walls, then an equilateral pointed arch
+  const { w, floor, spring } = NAVE, W = w * k, pts = [];
+  for (let i = 0; i <= 4; i++) pts.push(new THREE.Vector2(-W, floor + (spring - floor) * i / 4));
+  for (let i = 1; i <= 16; i++) { const a = Math.PI - i / 16 * Math.PI / 3; pts.push(new THREE.Vector2(W + 2 * W * Math.cos(a), spring + 2 * W * Math.sin(a))); }
+  for (let i = 1; i <= 16; i++) { const a = Math.PI / 3 - i / 16 * Math.PI / 3; pts.push(new THREE.Vector2(-W + 2 * W * Math.cos(a), spring + 2 * W * Math.sin(a))); }
+  for (let i = 1; i <= 4; i++) pts.push(new THREE.Vector2(W, spring - (spring - floor) * i / 4));
+  return pts;
+}
+
+function normalFromHeight(c, k) {  // a normal map from a grey height canvas
+  const W = c.width, H = c.height, d = c.getContext("2d").getImageData(0, 0, W, H).data, nd = new Uint8Array(W * H * 4);
+  const h = (i, j) => d[(((j + H) % H) * W + ((i + W) % W)) * 4] / 255;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const nx = -(h(i + 1, j) - h(i - 1, j)) * k, ny = (h(i, j + 1) - h(i, j - 1)) * k, l = Math.hypot(nx, ny, 1), o = (j * W + i) * 4;
+    nd[o] = (nx / l * .5 + .5) * 255; nd[o + 1] = (ny / l * .5 + .5) * 255; nd[o + 2] = (1 / l * .5 + .5) * 255; nd[o + 3] = 255;
+  }
+  const t = new THREE.DataTexture(nd, W, H, THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.needsUpdate = true;
+  return t;
+}
+
+function machineTextures() {
+  const canvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; };
+  const colorTex = (c, rep) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; if (rep) t.repeat.set(...rep); return t; };
+  // riveted iron plates: colour with soot and rust, and a height map for the seams and rivets
+  const [pc, p] = canvas(512, 512), [hc, h] = canvas(512, 512);
+  h.fillStyle = "#808080"; h.fillRect(0, 0, 512, 512);
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+    const x = i * 128, y = j * 128, v = rnd(30, 52) | 0;
+    p.fillStyle = `rgb(${v + 6},${v},${v - 4})`; p.fillRect(x, y, 128, 128);
+    for (let k = 0; k < 6; k++) {  // soot and rust stains
+      const cx = x + rnd(0, 128), cy = y + rnd(0, 128), r = rnd(10, 60), gr = p.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, Math.random() < .35 ? "rgba(120,58,24,.35)" : "rgba(0,0,0,.3)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+      p.fillStyle = gr; p.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+    }
+    p.strokeStyle = "rgba(0,0,0,.8)"; p.lineWidth = 3; p.strokeRect(x + 1.5, y + 1.5, 125, 125);
+    h.fillStyle = "#383838"; h.fillRect(x, y, 128, 3); h.fillRect(x, y, 3, 128);
+    for (let k = 0; k < 8; k++) for (const [rx, ry] of [[x + 10 + k * 15, y + 10], [x + 10 + k * 15, y + 118], [x + 10, y + 10 + k * 15], [x + 118, y + 10 + k * 15]]) {
+      const g2 = h.createRadialGradient(rx, ry, 0, rx, ry, 5); g2.addColorStop(0, "#e8e8e8"); g2.addColorStop(1, "#808080");
+      h.fillStyle = g2; h.fillRect(rx - 5, ry - 5, 10, 10);
+      p.fillStyle = "rgba(150,130,110,.35)"; p.beginPath(); p.arc(rx - 1, ry - 1, 2.5, 0, 7); p.fill();
+    }
+  }
+  // floor grating: a lattice of bars over darkness
+  const [gc, g] = canvas(256, 256), [gh, gH] = canvas(256, 256);
+  g.fillStyle = "#0b0a09"; g.fillRect(0, 0, 256, 256); gH.fillStyle = "#101010"; gH.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 256; i += 32) {
+    g.fillStyle = "#4a4540"; g.fillRect(i, 0, 9, 256); g.fillRect(0, i + 12, 256, 5);
+    gH.fillStyle = "#e0e0e0"; gH.fillRect(i, 0, 9, 256); gH.fillStyle = "#b0b0b0"; gH.fillRect(0, i + 12, 256, 5);
+  }
+  for (let k = 0; k < 400; k++) { g.fillStyle = `rgba(${Math.random() < .5 ? "160,150,140" : "90,50,20"},.12)`; g.fillRect(rnd(0, 256), rnd(0, 256), rnd(2, 14), 2); }
+  // stained glass: a lancet of leaded panes, amber, teal, crimson and cobalt
+  const [sc, s] = canvas(128, 512);
+  s.beginPath(); s.moveTo(0, 512); s.lineTo(0, 120); s.quadraticCurveTo(0, 20, 64, 0); s.quadraticCurveTo(128, 20, 128, 120); s.lineTo(128, 512); s.closePath();
+  s.save(); s.clip();
+  const pal = ["#d9902a", "#e8b84a", "#1f8a8a", "#2a5fb0", "#a8202c", "#6a2a8a", "#cfd6c0"];
+  for (let y = 0; y < 512; y += 40) for (let x = 0; x < 128; x += 32) {
+    s.fillStyle = pal[(Math.random() * pal.length) | 0]; s.fillRect(x, y, 32, 40);
+    const gr = s.createRadialGradient(x + 16, y + 20, 2, x + 16, y + 20, 30); gr.addColorStop(0, "rgba(255,255,255,.25)"); gr.addColorStop(1, "rgba(0,0,0,.25)");
+    s.fillStyle = gr; s.fillRect(x, y, 32, 40);
+  }
+  s.fillStyle = "#e8b84a"; s.beginPath(); s.arc(64, 150, 34, 0, 7); s.fill();  // a sun in the middle
+  s.fillStyle = "#a8202c"; s.beginPath(); s.arc(64, 150, 18, 0, 7); s.fill();
+  s.strokeStyle = "#0a0806"; s.lineWidth = 4;
+  for (let y = 0; y < 512; y += 40) { s.beginPath(); s.moveTo(0, y); s.lineTo(128, y); s.stroke(); }
+  for (let x = 0; x <= 128; x += 32) { s.beginPath(); s.moveTo(x, 0); s.lineTo(x, 512); s.stroke(); }
+  s.beginPath(); s.arc(64, 150, 34, 0, 7); s.stroke(); s.beginPath(); s.arc(64, 150, 18, 0, 7); s.stroke();
+  s.restore(); s.lineWidth = 8; s.stroke();
+  // gauge dial
+  const [dc, d] = canvas(256, 256);
+  d.fillStyle = "#e9dfc6"; d.beginPath(); d.arc(128, 128, 124, 0, 7); d.fill();
+  d.strokeStyle = "#2a2018"; d.lineWidth = 3;
+  for (let i = 0; i <= 20; i++) {
+    const a = Math.PI * (.75 + 1.5 * i / 20), r0 = i % 5 ? 96 : 84;
+    d.beginPath(); d.moveTo(128 + Math.cos(a) * r0, 128 + Math.sin(a) * r0); d.lineTo(128 + Math.cos(a) * 110, 128 + Math.sin(a) * 110); d.stroke();
+  }
+  d.strokeStyle = "#a8202c"; d.lineWidth = 8; d.beginPath(); d.arc(128, 128, 104, Math.PI * 1.95, Math.PI * 2.25); d.stroke();
+  return { plate: colorTex(pc, [3, 2]), plateN: normalFromHeight(hc, 3), grate: colorTex(gc, [6, 22]), grateN: normalFromHeight(gh, 4), glass: colorTex(sc), dial: colorTex(dc) };
+}
+
+function gearGeometry(R, n) {
+  const s = new THREE.Shape(), r = R * .86, steps = n * 4;
+  for (let i = 0; i < steps; i++) {
+    const a = i / steps * Math.PI * 2, rr = i % 4 === 1 || i % 4 === 2 ? R : r;
+    i ? s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  const hole = (x, y, rr) => { const p = new THREE.Path(); p.absarc(x, y, rr, 0, Math.PI * 2, true); s.holes.push(p); };
+  hole(0, 0, R * .13);
+  for (let i = 0; i < 5; i++) hole(Math.cos(i * 1.2566) * R * .5, Math.sin(i * 1.2566) * R * .5, R * .19);
+  return new THREE.ExtrudeGeometry(s, { depth: .12, bevelEnabled: true, bevelThickness: .02, bevelSize: .02, bevelSegments: 1, curveSegments: 10 });
+}
+
+// the guardian: a boiler on piston legs with a domed head and one glass eye. Its furnace door glows with
+// your pulse, its chimney puffs steam on the exhale and on every heartbeat, and it breathes with the guide.
+function automaton(mat) {
+  const group = new THREE.Group(), V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const add = (geo, m, x = 0, y = 0, z = 0, parent = group) => {
+    const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; parent.add(o); return o;
+  };
+  const limb = (a, b, r, m, parent = group) => {
+    const d = b.clone().sub(a), o = add(new THREE.CylinderGeometry(r, r, d.length(), 12), m, 0, 0, 0, parent);
+    o.position.copy(a).addScaledVector(d, .5); o.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); return o;
+  };
+  const glow = new THREE.MeshStandardMaterial({ color: 0x220800, emissive: 0xff5a14, emissiveIntensity: 1 });
+  const eye = new THREE.MeshStandardMaterial({ color: 0x041014, emissive: 0x52e6ff, emissiveIntensity: 2, roughness: .1 });
+  for (const s of [-1, 1]) {  // piston legs and iron feet
+    limb(V(.15 * s, .82, 0), V(.17 * s, .42, .02), .075, mat.iron); limb(V(.17 * s, .46, .02), V(.16 * s, .08, 0), .045, mat.copper);
+    add(new THREE.SphereGeometry(.075, 12, 10), mat.brass, .17 * s, .44, .02);
+    add(new THREE.BoxGeometry(.16, .07, .28), mat.iron, .16 * s, .035, .04);
+  }
+  add(new THREE.CylinderGeometry(.2, .22, .14, 20), mat.iron, 0, .84, 0);
+  const body = new THREE.Group(); body.position.y = .9; group.add(body);  // the boiler, which breathes
+  add(new THREE.CylinderGeometry(.3, .3, .66, 28), mat.brass, 0, .33, 0, body);
+  for (const y of [.03, .33, .63]) {
+    const band = add(new THREE.TorusGeometry(.305, .022, 8, 32), mat.iron, 0, y, 0, body); band.rotation.x = Math.PI / 2;
+    const riv = new THREE.InstancedMesh(new THREE.SphereGeometry(.012, 6, 4), mat.iron, 24), M4 = new THREE.Matrix4();
+    for (let i = 0; i < 24; i++) M4.setPosition(Math.cos(i / 24 * 6.283) * .325, y, Math.sin(i / 24 * 6.283) * .325), riv.setMatrixAt(i, M4);
+    body.add(riv);
+  }
+  add(new THREE.SphereGeometry(.3, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat.brass, 0, .66, 0, body).scale.y = .45;
+  // the furnace door: an iron frame, bars, and the fire behind
+  add(new THREE.BoxGeometry(.26, .22, .03), mat.iron, 0, .3, .29, body);
+  const fire = add(new THREE.PlaneGeometry(.2, .16), glow, 0, .3, .307, body);
+  for (let i = -1; i <= 1; i++) add(new THREE.BoxGeometry(.016, .17, .02), mat.iron, i * .055, .3, .312, body);
+  add(new THREE.CylinderGeometry(.06, .06, .02, 20), mat.dial, .17, .52, .25, body).rotation.x = Math.PI / 2;  // its own pressure gauge
+  const needle = new THREE.Group(); needle.position.set(.17, .52, .262); body.add(needle);
+  add(new THREE.BoxGeometry(.006, .05, .006), mat.red, 0, .022, 0, needle);
+  // chimney on the back, a little crooked
+  limb(V(.1, .55, -.26), V(.13, 1.15, -.3), .05, mat.copper, body);
+  add(new THREE.CylinderGeometry(.08, .055, .07, 14), mat.iron, .13, 1.17, -.3, body);
+  // arms: copper tubes and pistons; the left hand holds a lantern
+  for (const s of [-1, 1]) {
+    add(new THREE.SphereGeometry(.085, 14, 10), mat.iron, .36 * s, .56, 0, body);
+    limb(V(.37 * s, .52, 0), V(.43 * s, .22, .06), .045, mat.copper, body);
+    limb(V(.43 * s, .22, .06), V(.4 * s, -.02, .2), .036, mat.iron, body);
+    for (let k = -1; k <= 1; k++) limb(V(.4 * s, -.02, .2), V(.4 * s + k * .03, -.1, .24), .012, mat.brass, body);
+  }
+  const lantern = new THREE.Group(); lantern.position.set(.4, -.2, .24); body.add(lantern);
+  add(new THREE.SphereGeometry(.045, 12, 10), new THREE.MeshStandardMaterial({ color: 0x331a00, emissive: 0xffb050, emissiveIntensity: 3 }), 0, -.08, 0, lantern);
+  for (let k = 0; k < 4; k++) limb(V(Math.cos(k * 1.57) * .05, -.02, Math.sin(k * 1.57) * .05), V(Math.cos(k * 1.57) * .05, -.14, Math.sin(k * 1.57) * .05), .006, mat.iron, lantern);
+  add(new THREE.ConeGeometry(.065, .05, 12), mat.iron, 0, 0, 0, lantern);
+  // head: a domed helmet on a collar, one glass eye in a brass ring, and two little valves for ears
+  const head = new THREE.Group(); head.position.y = .82; body.add(head);
+  add(new THREE.CylinderGeometry(.09, .12, .08, 16), mat.iron, 0, -.04, 0, head);
+  add(new THREE.SphereGeometry(.17, 24, 16), mat.brass, 0, .1, 0, head).scale.set(1, .95, 1);
+  const lens = add(new THREE.SphereGeometry(.055, 16, 12), eye, 0, .11, .13, head);
+  const ring = add(new THREE.TorusGeometry(.062, .014, 8, 24), mat.iron, 0, .11, .155, head);
+  for (const s of [-1, 1]) { const v = add(new THREE.CylinderGeometry(.03, .03, .05, 10), mat.copper, .17 * s, .1, 0, head); v.rotation.z = Math.PI / 2; }
+  const light = new THREE.PointLight(0xff6a20, 2, 4, 1.6); light.position.set(0, .3, .5); body.add(light);
+  let blink = 0;
+  function update(t, dt, flow, level, beat) {
+    body.scale.set(1 + .05 * level, 1 + .02 * level, 1 + .05 * level);
+    head.rotation.y = .5 * n3(t * .08, 40, 0); head.rotation.x = -.08 + .06 * n3(t * .1, 41, 0);
+    group.rotation.x += (-.06 * flow - group.rotation.x) * Math.min(1, dt * 3);
+    lantern.rotation.z = .25 * Math.sin(t * 1.3) * (.3 + Math.abs(flow)); lantern.rotation.x = .3 * flow;
+    glow.emissiveIntensity = .7 + 3.5 * beat; light.intensity = 1.2 + 5 * beat;
+    blink = blink > 0 ? blink - dt : Math.random() < dt * .25 ? .14 : 0;
+    eye.emissiveIntensity = blink > 0 ? .1 : 1.8 + .4 * Math.sin(t * 2);
+    needle.rotation.z = 1.2 - 2.4 * level;
+  }
+  const chimneyTop = () => V(.13, 2.12, -.3).applyMatrix4(group.matrixWorld);
+  return { group, update, chimneyTop };
+}
+
+let M = null;  // the machine scene, made on first use
+function machineInit(canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene(), tex = machineTextures();
+  scene.background = new THREE.Color(0x0a0706); scene.fog = new THREE.FogExp2(0x2a1d14, .03);
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture;
+  const camera = new THREE.PerspectiveCamera(52, 1, .05, 200);
+  const mat = {
+    plate: new THREE.MeshStandardMaterial({ map: tex.plate, normalMap: tex.plateN, metalness: .7, roughness: .55, side: THREE.DoubleSide, envMapIntensity: .25 }),
+    iron: new THREE.MeshStandardMaterial({ color: 0x34302c, metalness: .85, roughness: .45, envMapIntensity: .4 }),
+    brass: new THREE.MeshPhysicalMaterial({ color: 0xb48a4e, metalness: 1, roughness: .3, clearcoat: .3, envMapIntensity: .6 }),
+    copper: new THREE.MeshStandardMaterial({ color: 0xb0623a, metalness: 1, roughness: .35, envMapIntensity: .5 }),
+    dial: new THREE.MeshStandardMaterial({ map: tex.dial, roughness: .4, emissive: 0xffe0b0, emissiveMap: tex.dial, emissiveIntensity: .25 }),
+    red: new THREE.MeshStandardMaterial({ color: 0x8a1010, roughness: .4 }),
+  };
+  const add = (geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; scene.add(o); return o; };
+  const { w, floor, spring, z0, end, rose, R } = NAVE, prof = archProfile();
+  // the nave: plates swept along the profile, a grating floor, ribs every bay
+  const pos = [], uv = [], idx = [];
+  let acc = 0;
+  prof.forEach((p, i) => { if (i) acc += p.distanceTo(prof[i - 1]); for (const z of [z0, end]) { pos.push(p.x, p.y, z); uv.push(acc / 6, (z0 - z) / 6); } });
+  for (let i = 0; i < prof.length - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+  const shellG = new THREE.BufferGeometry();
+  shellG.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); shellG.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  shellG.setIndex(idx); shellG.computeVertexNormals();
+  add(shellG, mat.plate).castShadow = false;
+  const fl = add(new THREE.PlaneGeometry(2 * w, z0 - end), new THREE.MeshStandardMaterial({ map: tex.grate, normalMap: tex.grateN, metalness: .8, roughness: .5, envMapIntensity: .3 }), 0, floor, (z0 + end) / 2);
+  fl.rotation.x = -Math.PI / 2;
+  const channel = new THREE.MeshStandardMaterial({ color: 0x0a0200, emissive: 0xc8380c, emissiveIntensity: .2 });  // embers under the grating
+  for (const x of [-.9, .9]) add(new THREE.PlaneGeometry(.04, z0 - end), channel, x, floor + .012, (z0 + end) / 2).rotation.x = -Math.PI / 2;
+  const ribs = [];
+  for (let k = 0; k < 10; k++) {
+    const z = 1 - k * 2.2, curve = new THREE.CatmullRomCurve3(archProfile(.985).map(p => new THREE.Vector3(p.x, p.y, z)));
+    ribs.push(z);
+    add(new THREE.TubeGeometry(curve, 140, .13, 8), mat.iron);
+    for (const s of [-1, 1]) add(new THREE.BoxGeometry(.42, .2, .42), mat.brass, s * (w - .1), spring, z);
+  }
+  // stained glass between the ribs
+  const glass = new THREE.MeshStandardMaterial({ map: tex.glass, emissiveMap: tex.glass, emissive: 0xffffff, emissiveIntensity: 1.2, alphaTest: .5, roughness: .25, side: THREE.DoubleSide });
+  for (let k = 0; k < 9; k++) for (const s of [-1, 1]) {
+    const win = add(new THREE.PlaneGeometry(.9, 3.2), glass, s * (w - .03), 1.1, ribs[k] - 1.1); win.rotation.y = -s * Math.PI / 2; win.castShadow = false;
+  }
+  // pipes along the walls with flanges, and the valves the steam comes out of
+  const vents = [];
+  for (const s of [-1, 1]) for (const [y, r] of [[-1.35, .13], [-.8, .09]]) {
+    add(new THREE.CylinderGeometry(r, r, z0 - end, 16), mat.copper, s * (w - .3), y, (z0 + end) / 2).rotation.x = Math.PI / 2;
+    for (const z of ribs) add(new THREE.TorusGeometry(r + .02, .035, 8, 20), mat.brass, s * (w - .3), y, z);
+  }
+  ribs.forEach((z, k) => {
+    if (k % 2 === 0 || k > 8) return;
+    for (const s of [-1, 1]) {
+      const wh = add(new THREE.TorusGeometry(.12, .02, 6, 16), mat.red, s * (w - .3), -.55, z + .4); wh.rotation.x = Math.PI / 2;
+      add(new THREE.CylinderGeometry(.015, .015, .18, 6), mat.iron, s * (w - .3), -.63, z + .4);
+      vents.push({ p: new THREE.Vector3(s * (w - .45), -.72, z + .4), d: new THREE.Vector3(-s, .35, rnd(-.2, .2)).normalize() });
+    }
+  });
+  // pistons that rise as the lungs fill
+  const rods = [];
+  for (const s of [-1, 1]) for (const z of [-4, -10, -16]) {
+    add(new THREE.CylinderGeometry(.24, .28, 1.3, 20), mat.iron, s * 2.5, floor + .65, z);
+    add(new THREE.TorusGeometry(.25, .04, 8, 24), mat.brass, s * 2.5, floor + 1.3, z).rotation.x = Math.PI / 2;
+    const rod = add(new THREE.CylinderGeometry(.09, .09, 1.8, 14), mat.brass, s * 2.5, 0, z);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(.5, .14, .3), mat.iron); head.position.y = .9; head.castShadow = true; rod.add(head);
+    rods.push(rod);
+  }
+  // the end wall with the rose window: tracery in front, a turbine behind, daylight beyond
+  const wall = new THREE.Shape(prof);
+  const hole = new THREE.Path(); hole.absarc(0, rose, R + .2, 0, Math.PI * 2, true); wall.holes.push(hole);
+  add(new THREE.ShapeGeometry(wall, 24), mat.plate, 0, 0, end);
+  const tracery = new THREE.Group(); tracery.position.set(0, rose, end + .05); scene.add(tracery);
+  const tr = (geo, x = 0, y = 0, rz = 0) => { const o = new THREE.Mesh(geo, mat.iron); o.position.set(x, y, 0); o.rotation.z = rz; o.castShadow = true; tracery.add(o); return o; };
+  tr(new THREE.TorusGeometry(R + .1, .16, 10, 64)); tr(new THREE.TorusGeometry(.75, .1, 8, 40));
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2;
+    tr(new THREE.BoxGeometry(.09, R - .75, .12), Math.cos(a) * (R + .75) / 2, Math.sin(a) * (R + .75) / 2, a - Math.PI / 2);
+    const b = a + Math.PI / 12; tr(new THREE.TorusGeometry(.42, .05, 6, 24), Math.cos(b) * 1.6, Math.sin(b) * 1.6);
+  }
+  const turbine = new THREE.Group(); turbine.position.set(0, rose, end - .7); scene.add(turbine);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(.3, .4, .5, 20), mat.brass); hub.rotation.x = Math.PI / 2; hub.castShadow = true; turbine.add(hub);
+  for (let i = 0; i < 7; i++) {
+    const arm = new THREE.Group(); arm.rotation.z = i / 7 * Math.PI * 2; turbine.add(arm);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(.55, R - .3, .03), mat.iron); blade.position.y = (R + .3) / 2; blade.rotation.y = .7; blade.castShadow = true; arm.add(blade);
+  }
+  const sky = new THREE.Mesh(new THREE.CircleGeometry(R + .6, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.4, 1.2), fog: false }));
+  sky.position.set(0, rose, end - 1.8); scene.add(sky);
+  // gears around the rose, meshing, driven by the air
+  const gears = [];
+  for (const [x, y, r, n, dir] of [[0, rose + R + 1.05, .75, 16, 1], [-1.2, rose + R + .7, .5, 11, -1], [1.2, rose + R + .7, .5, 11, -1],
+                                    [-2.75, floor + .9, .7, 15, 1], [2.75, floor + .9, .7, 15, -1], [-2.6, floor + 2.05, .38, 8, -1], [2.6, floor + 2.05, .38, 8, 1]]) {
+    const gm = add(gearGeometry(r, n), mat.brass, x, y, end + .06); gears.push({ m: gm, k: dir * .75 / r });
+  }
+  // gauges on the pipes near you: the left reads the breath, the right jumps with the pulse
+  const gauges = [];
+  for (const s of [-1, 1]) {
+    const gg = new THREE.Group(); gg.position.set(s * (w - .3), -.35, -1.6); gg.rotation.y = -s * Math.PI / 2; scene.add(gg);
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(.26, .26, .04, 32), mat.dial); face.rotation.x = Math.PI / 2; gg.add(face);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(.27, .03, 8, 32), mat.brass); gg.add(rim);
+    const nd = new THREE.Group(); nd.position.z = .03; gg.add(nd);
+    const nm = new THREE.Mesh(new THREE.BoxGeometry(.012, .2, .01), mat.red); nm.position.y = .09; nd.add(nm);
+    add(new THREE.CylinderGeometry(.03, .03, .2, 8), mat.iron, s * (w - .3), -.55, -1.6);
+    gauges.push(nd);
+  }
+  // clockwork moths in the light
+  const wingM = new THREE.MeshStandardMaterial({ color: 0xd9a050, emissive: 0x6a3a10, emissiveIntensity: .6, transparent: true, opacity: .85, side: THREE.DoubleSide, metalness: .5, roughness: .4 });
+  const moths = Array.from({ length: 7 }, (_, i) => {
+    const g = new THREE.Group(), wings = [];
+    const bodyM = new THREE.Mesh(new THREE.CapsuleGeometry(.02, .07, 4, 8), mat.brass); bodyM.rotation.x = Math.PI / 2; g.add(bodyM);
+    for (const s of [-1, 1]) {
+      const pv = new THREE.Group(); g.add(pv);
+      const wgm = new THREE.Mesh(new THREE.CircleGeometry(.07, 3), wingM); wgm.position.x = .065 * s; wgm.scale.set(1, .7, 1); wgm.rotation.x = -Math.PI / 2; pv.add(wgm);
+      wings.push([pv, s]);
+    }
+    scene.add(g);
+    return { g, wings, home: new THREE.Vector3(rnd(-1.8, 1.8), rnd(-.5, 2.5), rnd(-14, -4)), seed: i * 3.1 };
+  });
+  // light: daylight through the rose, chopped by the turbine; a dim warm fill
+  const sun = new THREE.SpotLight(0xffeed6, 36, 48, .34, .55, 1.05);
+  sun.position.set(0, rose + .9, end - 3); sun.target.position.set(0, floor + .4, -1);
+  sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -.0005; sun.shadow.radius = 3;
+  scene.add(sun, sun.target, new THREE.HemisphereLight(0xffcfa0, 0x200a04, .25));
+  const shaftU = { uTime: { value: 0 }, uFlow: { value: 0 }, uSpin: { value: 0 } };
+  const shaftLen = Math.hypot(end + 1, rose - floor - .6);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(R * .95, 3.6, shaftLen, 64, 1, true), new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: shaftU,
+    vertexShader: `varying float vAlong; varying vec3 vP; void main() { vAlong = position.y; vP = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: `uniform float uTime, uFlow, uSpin; varying float vAlong; varying vec3 vP;
+      void main() {
+        float along = clamp(vAlong / ${shaftLen.toFixed(2)} + .5, 0., 1.);  // 1 at the rose, 0 near you
+        float a = atan(vP.x, vP.z);
+        float rays = .5 + .5 * sin(a * 12. + uTime * .2) * sin(a * 5. - uTime * .15);
+        float blades = .55 + .45 * smoothstep(-.3, .7, sin(7. * (a - uSpin)));
+        float k = pow(along, 1.6) * rays * blades * (.045 + .05 * abs(uFlow));
+        gl_FragColor = vec4(vec3(1., .9, .74) * k, 1.);
+      }`,
+  }));
+  shaft.position.set(0, (rose + floor + .6) / 2, (end - 1) / 2);
+  shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, rose - floor - .6, end + 1).normalize());
+  scene.add(shaft);
+  const bot = automaton(mat); bot.group.position.set(-1.25, floor, -6.5); bot.group.rotation.y = .5; scene.add(bot.group);
+  const dust = particles(scene, 2200, false), steam = particles(scene, 380, true, 320);
+  dust.m.uniforms.uFocus.value = 8;
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), .6, .55, .82));
+  const grade = new ShaderPass(GRADE); composer.addPass(grade); composer.addPass(new OutputPass());
+  return { renderer, scene, camera, composer, grade, sun, shaftU, glass, channel, turbine, gears, rods, gauges, moths, vents, bot, dust, steam,
+           spin: 0, gear: 0, spawn: 0, sspawn: 0, w: 0, h: 0, beat0: 0 };
+}
+
+function machine(canvas, t, dt, flow, o) {
+  if (!M) M = machineInit(canvas);
+  const { renderer, camera, composer } = M, w = canvas.clientWidth, h = canvas.clientHeight, wind = Math.abs(flow);
+  if (w !== M.w || h !== M.h) {
+    M.w = w; M.h = h; renderer.setSize(w, h, false); composer.setSize(w, h);
+    camera.aspect = w / h; camera.fov = 52 + 28 * Math.max(0, 1 - w / h); camera.updateProjectionMatrix();
+    const s = h * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360));
+    M.dust.m.uniforms.uScale.value = s; M.steam.m.uniforms.uScale.value = s;
+  }
+  // the camera glides up the nave as the lungs fill and back as they empty
+  camera.position.set(.3 + .08 * n3(t * .07, 1, 5), -.25 + .06 * n3(t * .07, 2, 5), 2.2 - 1.4 * o.level);
+  camera.lookAt(.1 * n3(t * .05, 3, 5), 1.05, NAVE.end);
+  renderer.toneMappingExposure = 1 + .1 * (o.level - .5);
+  M.sun.intensity = 30 + 14 * o.level;
+  M.spin += dt * (5.5 * flow + .12 * Math.sign(flow || 1)); M.turbine.rotation.z = M.spin;
+  M.gear += dt * flow * .8; for (const g of M.gears) g.m.rotation.z = M.gear * g.k;
+  M.rods.forEach((r, i) => { r.position.y = NAVE.floor + .55 + 1.05 * o.level + .03 * Math.sin(t * 3 + i); });
+  M.shaftU.uTime.value = t; M.shaftU.uFlow.value = flow; M.shaftU.uSpin.value = M.spin;
+  M.glass.emissiveIntensity = 1 + .7 * o.level;
+  M.channel.emissiveIntensity = .1 + .7 * o.beat;
+  M.gauges[0].rotation.z = 2.3 - 4.6 * o.level; M.gauges[1].rotation.z = 1.6 - 2.6 * o.beat + .1 * Math.sin(t * 9);
+  M.grade.uniforms.uTime.value = t % 100;
+  M.bot.update(t, dt, flow, o.level, o.beat);
+  M.moths.forEach((m, i) => {
+    const p = m.home.clone().add(new THREE.Vector3(Math.sin(t * .6 + m.seed) * 1.1, Math.sin(t * .9 + m.seed * 2) * .5, Math.cos(t * .45 + m.seed) * 1.4 + 1.8 * flow));
+    m.g.position.lerp(p, Math.min(1, dt * 2)); m.g.lookAt(p.x + Math.cos(t * .6 + m.seed), p.y, p.z - Math.sin(t * .45 + m.seed));
+    for (const [pv, s] of m.wings) pv.rotation.z = s * (.2 + .9 * Math.abs(Math.sin(t * 26 + i)));
+  });
+  machineAir(t, dt, flow, o.beat);
+  composer.render(dt);
+}
+
+function machineAir(t, dt, flow, beat) {
+  const { dust, steam, vents, bot } = M, wind = Math.abs(flow), { end, rose, R, floor, w } = NAVE;
+  const field = (p, k) => {
+    const tt = t * (.3 + .6 * wind), kk = (.25 + 1.5 * wind) * k;
+    let vx = kk * n3(p.x * .3, p.y * .3 + 10, p.z * .3 + tt), vy = kk * n3(p.x * .3 + 20, p.y * .3, p.z * .3 + tt) - .03;
+    if (p.z < end + 4) { vx += p.x * .2 * flow; vy += (p.y - rose) * .2 * flow; }  // spreading in from the rose, gathering back to it
+    return [vx, vy, flow * 6.5 * (1 + .25 * n3(p.x * .5, p.y * .5, t * .6))];
+  };
+  const lit = p => {  // how much of the daylight shaft a point is in
+    const s = Math.min(Math.max((end - p.z) / (end + 1), 0), 1.1), cy = rose + (floor + .6 - rose) * s, r = R + (3.6 - R) * Math.min(s, 1);
+    const d2 = (p.x * p.x + (p.y - cy) * (p.y - cy)) / (r * r);
+    return Math.exp(-d2 * 2.2) * (.35 + .65 * (1 - s));
+  };
+  // dust: in through the rose on the inhale; stirred up near you and carried back out on the exhale
+  M.spawn = Math.min(M.spawn + dt * (flow > 0 ? 520 * flow : 140 * wind), 10);
+  for (let i = 0; M.spawn >= 1 && i < dust.N; i++) if (!dust.items[i].on) {
+    M.spawn--;
+    const kind = Math.random() < .85 ? "dust" : "fiber", a = rnd(0, 6.3), r = Math.sqrt(Math.random()) * R * .95;
+    const p = flow > 0 ? new THREE.Vector3(Math.cos(a) * r, rose + Math.sin(a) * r, end + .3) : new THREE.Vector3(rnd(-w + .4, w - .4), rnd(floor + .1, 3), rnd(-3, 2));
+    dust.items[i] = { on: true, kind, p, v: new THREE.Vector3(), size: rnd(.012, .032), alpha: rnd(.5, 1), tw: rnd(0, 9) };
+  }
+  // steam: bursts from the valves on the exhale, a hiss on the inhale; the automaton's chimney puffs on the
+  // exhale and on every heartbeat
+  const puff = (p, d, sp, size, a) => {
+    for (let i = 0; i < steam.N; i++) if (!steam.items[i].on) {
+      steam.items[i] = { on: true, kind: "steam", p: p.clone(), v: d.clone().multiplyScalar(sp), size, grow: rnd(.35, .6), alpha: a, life: 1, rate: 1 / rnd(2.2, 3.6) };
+      return;
+    }
+  };
+  M.sspawn = Math.min(M.sspawn + dt * (flow < 0 ? 70 * wind : 6), 8);
+  while (M.sspawn >= 1) {
+    M.sspawn--;
+    const v = vents[(Math.random() * vents.length) | 0];
+    puff(v.p, v.d, flow < 0 ? rnd(2, 3.5) : rnd(.6, 1.2), rnd(.15, .28), flow < 0 ? rnd(.14, .24) : rnd(.05, .09));
+  }
+  const top = bot.chimneyTop(), up = new THREE.Vector3(0, 1, 0);
+  if (flow < -.1 && Math.random() < dt * 20 * wind) puff(top, up, rnd(.6, 1), rnd(.05, .09), rnd(.08, .14));
+  if (beat > .85 && M.beat0 <= .85) for (let k = 0; k < 3; k++) puff(top, up, rnd(.8, 1.3), rnd(.04, .07), rnd(.1, .16));
+  M.beat0 = beat;
+  for (const sys of [dust, steam]) {
+    for (let i = 0; i < sys.N; i++) {
+      const it = sys.items[i], o3 = i * 3;
+      if (!it.on) { sys.A[i] = 0; continue; }
+      const [vx, vy, vz] = field(it.p, it.kind === "steam" ? .7 : 1), k = Math.min(1, dt * (it.kind === "steam" ? 1.3 : it.kind === "fiber" ? 4 : 7));
+      it.v.x += (vx - it.v.x) * k; it.v.y += (vy + (it.kind === "steam" ? .3 : 0) - it.v.y) * k; it.v.z += (vz * (it.kind === "steam" ? .6 : 1) - it.v.z) * k;
+      it.p.addScaledVector(it.v, dt);
+      if (it.p.x < -w + .1 || it.p.x > w - .1) it.p.x = Math.min(Math.max(it.p.x, -w + .1), w - .1);
+      if (it.p.y < floor + .05) it.p.y = floor + .05;
+      if (it.kind === "steam") { it.life -= dt * it.rate; it.size += dt * it.grow; }
+      if (it.p.z > 3.2 || it.p.z < end - .3 || it.p.y > 9 || (it.life !== undefined && it.life <= 0)) {
+        it.on = false; sys.A[i] = 0; if (sys.LC) sys.LC.fill(0, i * 6, i * 6 + 6); continue;
+      }
+      sys.P[o3] = it.p.x; sys.P[o3 + 1] = it.p.y; sys.P[o3 + 2] = it.p.z; sys.S[i] = it.size;
+      const L = lit(it.p), fade = Math.min(1, (3.2 - it.p.z) / 1.2);
+      if (it.kind === "steam") {
+        const c = .45 + 1.1 * L;
+        sys.A[i] = it.alpha * Math.sin(Math.PI * Math.min(1, it.life * 1.2)) * fade;
+        sys.C[o3] = .92 * c; sys.C[o3 + 1] = .86 * c; sys.C[o3 + 2] = .78 * c;
+      } else {
+        const c = (.12 + 2.4 * L) * (.75 + .5 * Math.sin(t * 6 + it.tw));
+        sys.A[i] = it.alpha * fade;
+        sys.C[o3] = c; sys.C[o3 + 1] = .9 * c; sys.C[o3 + 2] = .76 * c;
+        const o6 = i * 6, sp = it.v.length(), kk = it.alpha * .9 * Math.min(1, sp / 3) * fade * c;
+        sys.LP[o6] = it.p.x; sys.LP[o6 + 1] = it.p.y; sys.LP[o6 + 2] = it.p.z;
+        sys.LP[o6 + 3] = it.p.x - it.v.x * .065; sys.LP[o6 + 4] = it.p.y - it.v.y * .065; sys.LP[o6 + 5] = it.p.z - it.v.z * .065;
+        sys.LC[o6] = kk; sys.LC[o6 + 1] = .9 * kk; sys.LC[o6 + 2] = .76 * kk; sys.LC[o6 + 3] = sys.LC[o6 + 4] = sys.LC[o6 + 5] = 0;
+      }
+    }
+    for (const k of ["position", "aSize", "aAlpha", "aColor"]) sys.g.attributes[k].needsUpdate = true;
+    if (sys.lg) { sys.lg.attributes.position.needsUpdate = true; sys.lg.attributes.color.needsUpdate = true; }
+  }
+}
+
+window.nose3d = { frame, machine };
+</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
+</body>
+</html>
