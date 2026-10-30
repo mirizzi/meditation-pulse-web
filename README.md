@@ -52,8 +52,8 @@ Tranne il Venu 3S, questi dispositivi non li ho provati.
 
 Con un sensore collegato, **Download session** salva la sessione come file CSV: una riga per ogni
 lettura del battito, con ora, battiti al minuto, intervalli tra i battiti (ms), tecnica, fase e
-livello del respiro. Su iPhone, con l'app aggiunta alla schermata Home, si apre il foglio di
-condivisione: *Salva su File*, Mail e così via.
+livello del respiro. Il file finisce nei Download. Senza sensore (per esempio su iPhone) non ci sono
+letture da salvare.
 
 La sessione si può scaricare finché la pagina è aperta, anche dopo *Stop session*; chiudendo la
 pagina si perde. Le opzioni e quello che impara *Find my rhythm* restano invece nel browser.
