@@ -31,8 +31,22 @@ illustrato) · K guardiano · M musica · B respiro · Esc esci.
 Premi **Connect heart rate** e scegli il sensore. Funziona in Chrome o Edge su Android, Windows e Mac.
 Su iPhone e nell'app Mac non funziona, perché lì il Bluetooth dal web non c'è.
 
-Va bene qualsiasi sensore che trasmette il battito: fasce cardio, molti orologi sportivi. Su un
-Garmin: *Impostazioni → Sensori → Frequenza cardiaca al polso → Trasmetti frequenza cardiaca*.
+Provato con un **Garmin Venu 3S**. Su un Garmin: *Impostazioni → Sensori → Frequenza cardiaca al
+polso → Trasmetti frequenza cardiaca*.
+
+Va bene qualsiasi dispositivo che trasmette il battito con lo standard Bluetooth Heart Rate. Se si
+collega come sensore cardio a Zwift, Strava o a un tapis roulant, funziona anche qui.
+
+- **Fasce cardio** (le più precise): Polar H10, H9, H7; Garmin HRM-Dual, HRM-Pro, HRM-Fit; Wahoo
+  TICKR; Coospo, Decathlon e la maggior parte delle fasce "Bluetooth + ANT+".
+- **Bracciali ottici:** Polar Verity Sense, Scosche Rhythm, Wahoo TICKR Fit, Coospo HW807.
+- **Orologi** con la trasmissione del battito: quasi tutti i Garmin recenti (Venu, Forerunner, Fenix,
+  vívoactive, Instinct); molti Polar (Vantage, Grit X, Pacer, Ignite); COROS (Pace, Apex, Vertix);
+  vari Amazfit, Huawei, Xiaomi Smart Band e Fitbit Charge 6, con nomi diversi per l'opzione.
+- **Non funzionano da soli:** Apple Watch e Samsung Galaxy Watch, perché non trasmettono il battito
+  senza un'app di terze parti. Non vanno nemmeno i sensori solo ANT+.
+
+Tranne il Venu 3S, questi dispositivi non li ho provati.
 
 ## Privacy
 
