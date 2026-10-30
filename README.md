@@ -20,20 +20,26 @@ si apre come un'app, anche senza connessione.
 
 ## Come si usa
 
-Prima scegli il **ritmo del respiro**, nel riquadro in alto: è la cosa più importante, perché
-decide come si muovono il cuore, la musica e le immagini. Sotto c'è scritto a cosa serve ognuno; se
-non sai quale, inizia da *Coherent* (5,5 respiri al minuto). Dopo la prima sessione il riquadro diventa
-una riga sottile; *About the rhythms* lo riapre.
+All'apertura hai due scelte:
 
-Poi premi **Meditate**. In **Options** scegli la modalità (per esempio *Guardian*, con il guardiano
-nel naso) e i suoni: musica, canto, suono del respiro, voce.
+- **Connect your heart rate sensor:** colleghi l'orologio o la fascia e la meditazione parte.
+- **Just meditate:** parte subito, senza misurare niente.
+
+La meditazione parte con il ritmo *Deep calm* (4-4-8-2, 3,3 respiri al minuto). Vedi solo il
+cerchio che respira, e senti la musica e il suono del respiro. Non ci sono parole, numeri o disegni.
+
+Il **ritmo del respiro** è la cosa più importante, perché decide come si muovono il cuore, la musica e
+le immagini. Lo cambi da *Open the dashboard*, nel riquadro in alto, oppure in **Options** mentre
+mediti; sotto c'è scritto a cosa serve ognuno. In **Options** scegli anche altre modalità (per
+esempio *Guardian*, con il guardiano nel naso) e i suoni: musica, canto, suono del respiro, voce.
 
 Con la tastiera: 1–8 modalità · O opzioni · L aspetto (cinematografico, macchina a vapore,
 illustrato) · K guardiano · M musica · B respiro · Esc esci.
 
 ## Il battito (facoltativo)
 
-Premi **Connect heart rate** e scegli il sensore. Funziona in Chrome o Edge su Android, Windows e Mac.
+Premi **Connect your heart rate sensor** all'apertura (o *Connect heart rate* nel dashboard) e
+scegli il sensore. Funziona in Chrome o Edge su Android, Windows e Mac.
 Su iPhone e nell'app Mac non funziona, perché lì il Bluetooth dal web non c'è.
 
 Provato con un **Garmin Venu 3S**. Su un Garmin: *Impostazioni → Sensori → Frequenza cardiaca al

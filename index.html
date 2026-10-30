@@ -96,6 +96,8 @@
   body.zen.opt-nose.look3d #nose3d { display: block; }
   #noseM { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; background: #000; }
   body.zen.opt-nose.lookM #noseM { display: block; }
+  body.zen #rhythm { display: none; }  /* while meditating the rhythm is chosen in the options panel */
+  body.zen { background: radial-gradient(ellipse at 50% 45%, #141e31 0%, var(--bg) 60%) fixed; }
   body.zen.opt-dark::after { content: ""; position: fixed; inset: 0; background: #000; opacity: var(--darkness, .9); pointer-events: none; }
   body.zen #zenBar { display: flex; gap: 8px; align-items: center; position: fixed; top: 14px; right: 16px; z-index: 2;
     opacity: .35; transition: opacity .6s; }
@@ -137,6 +139,24 @@
   #panelStart { width: 100%; margin-top: 18px; }
   body.zen #panelStart { display: none; }
   .hint { color: var(--muted); font-size: 12px; margin-top: 16px; }
+
+  /* the web app opens here: connect a heart rate sensor, or just meditate */
+  #welcome { display: none; position: fixed; inset: 0; z-index: 10; overflow-y: auto; padding: 24px 16px;
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at 50% 35%, #172540 0%, #0b0f16 62%, #06080c 100%); }
+  body.welcome #welcome { display: flex; }
+  .wbox { width: 100%; max-width: 430px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  #wCircle { width: 160px; height: 160px; border-radius: 50%; margin: 4px 0 10px; border: 2px solid var(--breath);
+    background: radial-gradient(circle, #539bf555, #539bf511); box-shadow: 0 0 60px #539bf533; transform: scale(.55); }
+  #welcome h1 { font-size: 30px; font-weight: 300; letter-spacing: .02em; margin: 0; }
+  #welcome p { color: var(--muted); margin: 0; }
+  .wbtn { width: 100%; padding: 18px 20px; border-radius: 14px; font-size: 18px; text-align: left;
+    display: flex; flex-direction: column; gap: 4px; }
+  .wbtn small { font-size: 13px; color: var(--muted); }
+  .wbtn.primary { background: linear-gradient(135deg, #2b5ea6, #3f80d8); border-color: transparent; color: #fff; margin-top: 8px; }
+  .wbtn.primary small { color: #dbe7ff; }
+  .wbtn:disabled { opacity: .5; cursor: default; }
+  .wlink { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 13px; padding: 4px; }
 </style>
 </head>
 <body>
@@ -146,6 +166,18 @@
   <span id="modeName"></span>
   <button id="zenOpt" title="Modes and options (O)">Options</button>
   <button id="zenExit" title="Back to the dashboard (Esc)">Exit</button>
+</div>
+<div id="welcome">
+  <div class="wbox">
+    <div id="wCircle"></div>
+    <h1>Meditation Pulse</h1>
+    <p>Slow breathing with a guide, music and the sound of the breath.</p>
+    <p id="wRhythm"></p>
+    <button class="wbtn primary" id="wSensor">♥&nbsp; Connect your heart rate sensor
+      <small id="wSensorNote">A watch or a chest strap: see your heart follow your breath</small></button>
+    <button class="wbtn" id="wJust">Just meditate<small>No monitoring</small></button>
+    <button class="wlink" id="wDash">Open the dashboard</button>
+  </div>
 </div>
 <div id="panel">
   <div class="phead"><b>Meditation options</b><button id="panelClose" title="Close (Esc)">✕</button></div>
@@ -719,8 +751,8 @@ function nextTrial() {
 // ---- meditation view: circle, words, seconds, chart, spoken voice, chant, breath sound, music and
 // dark screen can each be switched on or off, alone or in any mix; the named modes are starting points
 const PRESETS = {
-  flow:   { name: "Flow",   hint: "breathing circle and music",
-            circle: true,  nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: false, music: true,  dark: false },
+  flow:   { name: "Flow",   hint: "breathing circle, music and the sound of breathing",
+            circle: true,  nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: true,  music: true,  dark: false },
   circle: { name: "Circle", hint: "only the breathing circle, silent",
             circle: true,  nose: false, words: false, count: false, chart: false, voice: false, chant: false, breath: false, music: false, dark: false },
   music:  { name: "Music",  hint: "only the music, dark screen",
@@ -738,7 +770,7 @@ const PRESETS = {
 };
 const VIEW_KEYS = ["circle", "nose", "words", "count", "chart", "voice", "chant", "breath", "music", "dark"];
 const { name: _n, hint: _h, ...FLOW } = PRESETS.flow;
-const DEFAULTS = { preset: "flow", ...FLOW, fade: true, darkness: .9, tech: "coherent", custom: [4, 4, 4, 4],
+const DEFAULTS = { preset: "flow", ...FLOW, fade: true, darkness: .9, tech: "deep", custom: [4, 4, 4, 4],
                    lang: "en", voiceVol: .9, voiceRate: .7, chantStyle: "soham",
                    vol: .8, inst: .8, bowls: .7, tanpura: .5, pad: .5, chantVol: .7, breathVol: .6,
                    follow: .6, human: .5, glow: true, ticks: false,
@@ -1938,7 +1970,29 @@ async function btConnect() {
     await btAttach(dev);
   } catch (e) { if (e.name !== "NotFoundError") setStatus("web_error"); }  // NotFoundError: the chooser was cancelled
 }
+// the welcome screen: its circle breathes the chosen rhythm
+function showWelcome() {
+  document.body.classList.add("welcome");
+  const d = TECH[opt.tech] || TECH.deep, T = d.reduce((a, b) => a + b, 0), at = k => d.slice(0, k).reduce((a, b) => a + b, 0) / T;
+  const f = (s, offset) => ({ transform: `scale(${s})`, offset, easing: "ease-in-out" });
+  $("wCircle").animate([f(.55, 0), f(1, at(1)), f(1, at(2)), f(.55, at(3)), f(.55, 1)], { duration: T * 1000, iterations: Infinity });
+  $("wRhythm").textContent = `${$("tech").selectedOptions[0].text} · ${+(60 / T).toFixed(1)} breaths a minute · change it in the dashboard`;
+  if (!navigator.bluetooth) {
+    $("wSensor").disabled = true;
+    $("wSensorNote").textContent = "Not in this browser: use Chrome or Edge on Android, Windows or Mac";
+  }
+}
+const hideWelcome = () => document.body.classList.remove("welcome");
+$("wSensor").onclick = async () => {
+  window.Tone?.start();  // unlock sound now, while this click still counts: the Bluetooth chooser uses it up
+  await btConnect();
+  if ($("dot").className === "on") { hideWelcome(); setZen(true); }
+};
+$("wJust").onclick = () => { hideWelcome(); setZen(true); };
+$("wDash").onclick = hideWelcome;
+
 if (WEB) {
+  if (!location.hash) showWelcome();
   $("stopBtn").textContent = "Connect heart rate";
   $("stopBtn").title = "Pair a watch or chest strap that broadcasts heart rate over Bluetooth";
   $("stopBtn").onclick = btConnect;

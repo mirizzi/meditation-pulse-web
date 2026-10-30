@@ -1,7 +1,7 @@
 // Keeps the web app working offline once it has been opened: the app's own files are cached when it is
 // installed, the libraries from the CDNs (Tone.js, three.js, the 3D models) the first time they load.
 // web/build.sh stamps the version, so a new build replaces the old cache.
-const CACHE = "mp-20261030112312";
+const CACHE = "mp-20261030112655";
 const APP = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
   ...["Bb3", "Bb4", "C4", "C6", "Db4", "Eb3", "Eb4", "F4", "G4"].map(n => `sounds/samples/${n}.m4a`)];
 
