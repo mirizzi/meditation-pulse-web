@@ -258,6 +258,7 @@
   <div class="controls">
     <button class="primary" id="startBtn">Start session</button>
     <button id="resetBtn">Reset</button>
+    <button id="saveBtn" disabled title="Save this session's pulse and breathing as a CSV file">Download session</button>
     <select id="tech">
       <option value="off">No breathing guide</option>
       <option value="box">Box · 4-4-4-4</option>
@@ -343,17 +344,19 @@ function breathAt(t) {
   }
 }
 
+const techName = () => TECH[guide.name] ? guide.name : `${guide.name} ${guide.d.join("-")}`;
 function postBreath(b) {
   if (WEB) return;
   fetch("/breath", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(b ? { technique: TECH[guide.name] ? guide.name : `${guide.name} ${guide.d.join("-")}`,
+    body: JSON.stringify(b ? { technique: techName(),
                                phase: b.phase, start: b.phaseStart, dur: b.dur } : {}) }).catch(() => {});
 }
 
 // ---- data
 const hr = [];           // {t, bpm}
 const breath = [];       // {t, level}, gaps when the guide is off
-let session = null;      // {start, readings, rr, byPhase}
+let session = null;      // {start, readings, rr, byPhase, log}
+let saved = null;        // the session to download: the current one, or the last one stopped
 
 function fmtTime(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
 const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
@@ -380,7 +383,10 @@ function onHr(m) {
   if (session) {
     session.readings.push(m.bpm);
     session.rr.push(...m.rr);
-    if (guide) session.byPhase[breathAt(m.t).phase].push(m.bpm);
+    const b = guide && breathAt(m.t);
+    if (b) session.byPhase[b.phase].push(m.bpm);
+    session.log.push([m.t, m.bpm, m.rr, b ? techName() : "", b ? b.phase : "", b ? b.level : null]);
+    $("saveBtn").disabled = false;
   }
   updateStats();
 }
@@ -521,13 +527,28 @@ function clearStats() {
 }
 $("startBtn").onclick = () => {
   if (session) { session = null; $("startBtn").textContent = "Start session"; return; }
-  session = { start: now(), readings: [], rr: [], byPhase: { in: [], hold_in: [], out: [], hold_out: [] } };
+  session = saved = { start: now(), readings: [], rr: [], byPhase: { in: [], hold_in: [], out: [], hold_out: [] }, log: [] };
+  $("saveBtn").disabled = true;
   $("startBtn").textContent = "Stop session";
   clearStats();
 };
 $("resetBtn").onclick = () => {
-  session = null; hr.length = 0; breath.length = 0;
+  session = saved = null; hr.length = 0; breath.length = 0; $("saveBtn").disabled = true;
   $("startBtn").textContent = "Start session"; $("sTime").textContent = "0:00"; clearStats();
+};
+// the session as CSV, in the same columns as the monitor's files in sessions/ (one row per pulse reading)
+$("saveBtn").onclick = async () => {
+  if (!saved?.log.length) return;
+  const local = t => new Date(t * 1000 - new Date(t * 1000).getTimezoneOffset() * 60000).toISOString().slice(0, 23);
+  const rows = [["time", "bpm", "rr_ms", "technique", "breath_phase", "breath_level"],
+    ...saved.log.map(([t, bpm, rr, tech, phase, level]) => [local(t), bpm, rr.map(x => x.toFixed(0)).join(" "), tech, phase, level === null ? "" : level.toFixed(2)])];
+  const name = `meditation-pulse_${local(saved.start).slice(0, 19).replace("T", "_").replaceAll(":", "-")}.csv`;
+  const file = new File([rows.map(r => r.join(",")).join("\n") + "\n"], name, { type: "text/csv" });
+  // an app on the iPhone home screen can't download: offer the share sheet (Save to Files, Mail…)
+  if (navigator.standalone && navigator.canShare?.({ files: [file] })) return navigator.share({ files: [file] }).catch(() => {});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(file); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 $("tech").onchange = e => setGuide(e.target.value);
 document.querySelectorAll("#custom input").forEach(i => i.oninput = () => setGuide("custom"));
