@@ -22,7 +22,8 @@ si apre come un'app, anche senza connessione.
 
 Prima scegli il **ritmo del respiro**, nel riquadro in alto: è la cosa più importante, perché
 decide come si muovono il cuore, la musica e le immagini. Sotto c'è scritto a cosa serve ognuno; se
-non sai quale, inizia da *Coherent* (5,5 respiri al minuto).
+non sai quale, inizia da *Coherent* (5,5 respiri al minuto). Dopo la prima sessione il riquadro diventa
+una riga sottile; *About the rhythms* lo riapre.
 
 Poi premi **Meditate**. In **Options** scegli la modalità (per esempio *Guardian*, con il guardiano
 nel naso) e i suoni: musica, canto, suono del respiro, voce.

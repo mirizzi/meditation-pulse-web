@@ -123,6 +123,13 @@
   #panel input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--breath); }
   #rhythm { background: var(--panel); border: 1px solid var(--breath); border-radius: 10px; padding: 12px 14px; margin-top: 16px; }
   #rhythm .rlabel { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  #rhythmToggle { float: right; padding: 2px 8px; font-size: 12px; color: var(--muted); margin-left: 8px; }
+  /* after the first session the card shrinks to one quiet line; the toggle opens it again */
+  #rhythm.compact { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-color: var(--line); padding: 6px 10px; }
+  #rhythm.compact .rlabel { display: flex; align-items: center; gap: 8px; margin: 0; order: 2; margin-left: auto; }
+  #rhythm.compact .rlabel b { display: none; }
+  #rhythm.compact .rtag, #rhythm.compact #techInfo { display: none; }
+  #rhythm.compact #tech { font-size: 14px; }
   #rhythm .rlabel b { color: var(--breath); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
   .trow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   #tech { font-size: 16px; }
@@ -213,8 +220,9 @@
   </header>
 
   <section id="rhythm">
-    <div class="rlabel"><b>Breathing rhythm</b> · the heart of the practice: it sets how your heart, the music
-      and the pictures move</div>
+    <div class="rlabel"><b>Breathing rhythm</b><span class="rtag"> · the heart of the practice: it sets how your
+      heart, the music and the pictures move</span>
+      <button id="rhythmToggle" title="Show or hide what the rhythms do"></button></div>
     <div id="techBox">
       <div class="trow">
         <select id="tech">
@@ -335,7 +343,7 @@ const TECH_INFO = {
 function showTechInfo() {
   const n = $("tech").value, d = n === "custom" ? customDurations() : TECH[n], sum = d ? d.reduce((a, b) => a + b, 0) : 0;
   $("custom").className = n === "custom" ? "show" : "";
-  $("techInfo").textContent = (sum > 0 ? `${+(60 / sum).toFixed(1)} breaths a minute · ` : "") + TECH_INFO[n];
+  $("techInfo").textContent = $("tech").title = (sum > 0 ? `${+(60 / sum).toFixed(1)} breaths a minute · ` : "") + TECH_INFO[n];
 }
 
 let guide = null;        // {name, d: [4 durations], start}
@@ -559,6 +567,7 @@ function clearStats() {
 $("startBtn").onclick = () => {
   if (session) { session = null; $("startBtn").textContent = "Start session"; return; }
   session = saved = { start: now(), readings: [], rr: [], byPhase: { in: [], hold_in: [], out: [], hold_out: [] }, log: [] };
+  if (!opt.rhythmCompact) setOpt({ rhythmCompact: true });  // chosen once: from now on a quiet line
   $("saveBtn").disabled = true;
   $("startBtn").textContent = "Stop session";
   clearStats();
@@ -733,7 +742,7 @@ const DEFAULTS = { preset: "flow", ...FLOW, fade: true, darkness: .9, tech: "coh
                    lang: "en", voiceVol: .9, voiceRate: .7, chantStyle: "soham",
                    vol: .8, inst: .8, bowls: .7, tanpura: .5, pad: .5, chantVol: .7, breathVol: .6,
                    follow: .6, human: .5, glow: true, ticks: false,
-                   guardStyle: "worker", noseView: "section", noseLook: "cinematic", guard3d: "mite" };
+                   guardStyle: "worker", noseView: "section", noseLook: "cinematic", guard3d: "mite", rhythmCompact: false };
 const WORDS = {
   en: { in: "Inhale", hold_in: "Hold", out: "Exhale", hold_out: "Hold" },
   it: { in: "Inspira", hold_in: "Trattieni", out: "Espira", hold_out: "Pausa" },
@@ -763,6 +772,8 @@ function applyOpt() {
   for (const k of ["circle", "nose", "words", "count", "chart", "dark", "fade"]) c.toggle("opt-" + k, !!opt[k]);
   c.toggle("look3d", opt.noseLook === "cinematic");
   c.toggle("lookM", opt.noseLook === "machine");
+  $("rhythm").classList.toggle("compact", !!opt.rhythmCompact);
+  $("rhythmToggle").textContent = opt.rhythmCompact ? "About the rhythms" : "Hide";
   document.body.style.setProperty("--darkness", opt.darkness);
   document.querySelectorAll("[data-opt]").forEach(el => {
     const v = opt[el.dataset.opt];
@@ -793,6 +804,7 @@ function setPanel(on) {
 $("optBtn").onclick = () => setPanel(true);
 $("zenOpt").onclick = () => setPanel(!document.body.classList.contains("panel"));
 $("panelClose").onclick = () => setPanel(false);
+$("rhythmToggle").onclick = () => setOpt({ rhythmCompact: !opt.rhythmCompact });
 $("panelStart").onclick = () => setZen(true);
 
 // the breathing technique is remembered too
