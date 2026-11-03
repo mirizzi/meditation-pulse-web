@@ -2068,6 +2068,35 @@ if (WEB) {
   setInterval(() => { if (src?.live() && now() - src.last > 10) setStatus("no_data", src.name); }, 5000);
 }
 
+// ---- updates for the web app: a phone keeps an installed app open in the background for days, so the
+// page asks for a new version whenever it comes back to the screen (and every hour). The new service
+// worker takes over at once; the page then reloads itself if nothing is going on, or offers a button.
+if (WEB && "serviceWorker" in navigator) {
+  const hadWorker = !!navigator.serviceWorker.controller;  // the very first install isn't an update
+  let reg = null;
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { reg = r; }).catch(() => {});
+  const check = () => reg?.update().catch(() => {});
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
+  setInterval(check, 3600 * 1000);
+  const busy = () => zen || !!session || !!src || !!saved;  // saved: a session still to download
+  let ready = false;
+  const offer = () => {
+    if (!busy()) return location.reload();
+    if ($("updateBar")) return;
+    const bar = Object.assign(document.createElement("button"), { id: "updateBar",
+      textContent: "A new version is ready · tap to reload", onclick: () => location.reload() });
+    bar.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:20;" +
+      "padding:10px 16px;border-radius:999px;background:var(--panel);border:1px solid var(--breath);color:var(--text);font-size:14px";
+    document.body.append(bar);
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadWorker || ready) return;
+    ready = true; offer();
+  });
+  // reloads on its own at the next quiet moment: back on the welcome screen or the dashboard, no session
+  setInterval(() => { if (ready && !busy() && !document.hidden) location.reload(); }, 5000);
+}
+
 // ---- live stream from hr_monitor.py
 let stopped = false;
 if (!WEB) $("stopBtn").onclick = () => {
@@ -3299,6 +3328,5 @@ function machineAir(t, dt, flow, beat) {
 
 window.nose3d = { frame, machine };
 </script>
-<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
 </body>
 </html>
