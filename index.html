@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script>window.MP_WEB = true; window.MP_VERSION = "20261103162705";</script>
+<script>window.MP_WEB = true; window.MP_VERSION = "20261103202944";</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -152,6 +152,10 @@
   #welcome p { color: var(--muted); margin: 0; }
   #welcome #wStatus { color: var(--text); font-size: 14px; }
   #welcome #wStatus:empty { display: none; }
+  #wInstall { color: var(--muted); font-size: 13px; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 12px; width: 100%; }
+  #wInstall:empty { display: none; }
+  #wInstall button { margin-top: 6px; }
+  #wInstall .share { display: inline-block; width: 13px; height: 16px; vertical-align: -2px; margin: 0 2px; }
   .wbtn { width: 100%; padding: 18px 20px; border-radius: 14px; font-size: 18px; text-align: left;
     display: flex; flex-direction: column; gap: 4px; }
   .wbtn small { font-size: 13px; color: var(--muted); }
@@ -181,6 +185,7 @@
     <p id="wStatus" aria-live="polite"></p>
     <button class="wbtn" id="wJust">Just meditate<small>No monitoring</small></button>
     <button class="wlink" id="wDash">Open the dashboard</button>
+    <div id="wInstall"></div>
   </div>
 </div>
 <div id="panel">
@@ -2066,6 +2071,31 @@ if (WEB) {
   if (navigator.bluetooth) { $("allBtBtn").style.display = ""; $("allBtBtn").onclick = () => btConnect(true); }
   setStatus("web");
   setInterval(() => { if (src?.live() && now() - src.last > 10) setStatus("no_data", src.name); }, 5000);
+}
+
+// ---- install it as an app. Android (Chrome, Edge) lets the page offer it: an Install button. An iPhone or
+// iPad never offers it and doesn't let a page ask, so the welcome screen shows how: Share, then Add to Home Screen.
+let installEvent = null;
+const installed = () => navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+const SHARE_ICON = `<svg class="share" viewBox="0 0 13 16" fill="none" stroke="currentColor" stroke-width="1.4"
+  stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v9M3.5 4l3-3 3 3M4 7H1.5v8h10V7H9"/></svg>`;
+function showInstall() {
+  const box = $("wInstall");
+  if (!WEB || installed()) return box.replaceChildren();
+  if (installEvent) {
+    box.innerHTML = `Keep it on your phone like an app, also offline.<br><button class="primary">Install the app</button>`;
+    box.querySelector("button").onclick = async () => { installEvent.prompt(); await installEvent.userChoice; installEvent = null; showInstall(); };
+  } else if (isIOS) {
+    box.innerHTML = /CriOS|FxiOS|EdgiOS/.test(navigator.userAgent)
+      ? `<b>Install it on your iPhone:</b> tap Share ${SHARE_ICON} in the address bar, then <b>Add to Home Screen</b>.`
+      : `<b>Install it on your iPhone:</b> tap Share ${SHARE_ICON} at the bottom of Safari (in the ••• menu on newer iPhones),
+         then <b>Add to Home Screen</b>. It opens like an app, also offline.`;
+  }
+}
+if (WEB) {
+  addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvent = e; showInstall(); });
+  addEventListener("appinstalled", () => { installEvent = null; showInstall(); });
+  showInstall();
 }
 
 // ---- updates for the web app. A phone keeps an installed app open in the background for days and an
