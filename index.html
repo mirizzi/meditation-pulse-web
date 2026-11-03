@@ -178,8 +178,6 @@
     <button class="wbtn primary" id="wSensor">♥&nbsp; Connect your heart rate sensor
       <small id="wSensorNote">A watch, chest strap, armband or pulse oximeter: see your heart follow your breath</small></button>
     <button class="wlink" id="wAll">Not in the list? Show every Bluetooth device</button>
-    <button class="wbtn" id="wCam">Measure with the camera
-      <small id="wCamNote">No sensor needed: rest a fingertip on the phone's back camera; the flashlight turns on</small></button>
     <p id="wStatus" aria-live="polite"></p>
     <button class="wbtn" id="wJust">Just meditate<small>No monitoring</small></button>
     <button class="wlink" id="wDash">Open the dashboard</button>
@@ -255,7 +253,6 @@
       <button id="awakeBtn" title="Stop the screen from dimming or sleeping, also on battery">Keep screen on</button>
       <button id="stopBtn" title="Stop the monitor and release the watch">Stop monitor</button>
       <button id="allBtBtn" style="display:none" title="For sensors that don't show up in the list">Any Bluetooth device</button>
-      <button id="camBtn" style="display:none" title="No sensor? Rest a fingertip on the camera">Pulse by camera</button>
     </div>
   </header>
 
@@ -446,16 +443,11 @@ function setStatus(st, dev) {
     connected: `Connected · ${dev}`, scanning: "Searching for watch…", connecting: `Connecting to ${dev}…`,
     not_found: "Watch not found — turn on HR broadcast", no_data: `${dev} connected but sending no pulse — turn on Broadcast Heart Rate`, disconnected: "Disconnected — reconnecting…",
     starting: "Starting…", web: "Breathing guide ready · connect a heart rate sensor if you have one",
-    web_nobt: "Bluetooth sensors need Chrome or Edge on Android, Windows or Mac; or measure with the camera",
-    web_ios: "On iPhone, Bluetooth sensors work in the free Bluefy browser; or measure with the camera",
+    web_nobt: "Bluetooth sensors need Chrome or Edge on Android, Windows or Mac; the breathing guide works everywhere",
+    web_ios: "On iPhone, Bluetooth sensors work in the free Bluefy browser; the breathing guide works everywhere",
     web_error: "Couldn't connect to the heart rate sensor — try again",
     web_nohr: `${dev} doesn't send heart rate — choose another device, or turn on its heart rate broadcast`,
-    camera_start: "Starting the camera…", camera_none: "No camera in this browser",
-    camera_denied: "The camera isn't allowed — allow it in the browser's settings, or connect a sensor",
-    camera_finger: "Rest a fingertip lightly on the camera (and the flashlight), and keep still",
-    camera_wait: "Finger on the camera · finding your pulse…",
   }[st] || st;
-  if (st === "connected" && dev === "camera") $("statusText").textContent = "Pulse from the camera ✓";
   if ($("wStatus")) $("wStatus").textContent = /^web$/.test(st) ? "" : $("statusText").textContent;
   if (st === "connected" && pendingZen && document.body.classList.contains("welcome")) {
     pendingZen = false; document.body.classList.remove("welcome"); setZen(true);
@@ -1958,14 +1950,12 @@ $("awakeBtn").onclick = async () => {
 // the browser drops the lock whenever the page is hidden; take it again on return
 document.addEventListener("visibilitychange", () => { if (WEB && awake && document.visibilityState === "visible") lockScreen(); });
 
-// ---- the web app: heart rate from any sensor, in three ways. One source runs at a time (src).
+// ---- the web app: heart rate from any sensor, in two ways. One source runs at a time (src).
 //  - Bluetooth (Web Bluetooth in Chrome/Edge, or Bluefy on iPhone): the standard Heart Rate service, read
 //    the way hr_monitor.py reads it, or a pulse oximeter's standard Pulse Oximeter service; reconnects if
 //    the sensor drops. "Show every device" finds sensors that don't advertise their service.
 //  - the Mac app (web/mac): it has no Web Bluetooth, so it reads the same services with CoreBluetooth and
 //    hands each value to mpNative() below.
-//  - the camera: a fingertip on the lens (the flashlight on, where the browser allows it). Each heartbeat
-//    darkens the red of the finger a little; the beats come from the peaks of that signal.
 function parseHr(v) {
   const f = v.getUint8(0), bpm = f & 1 ? v.getUint16(1, true) : v.getUint8(1), rr = [];
   let i = (f & 1 ? 3 : 2) + (f & 8 ? 2 : 0);  // skip energy expended
@@ -1985,7 +1975,7 @@ function parsePlx(v) {  // flags, SpO2, pulse rate (continuous and spot-check me
 }
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const NATIVE = window.webkit?.messageHandlers?.mpBluetooth;  // the Mac app's CoreBluetooth
-const HAS_BT = !!(navigator.bluetooth || NATIVE), HAS_CAM = !!navigator.mediaDevices?.getUserMedia;
+const HAS_BT = !!(navigator.bluetooth || NATIVE);
 let src = null;          // {kind, name, last, live(), stop()}
 var pendingZen = false;  // the welcome screen waits for the first connection, then starts meditating
 const stopSource = () => { src?.stop(); src = null; };
@@ -2042,79 +2032,6 @@ window.mpNative = m => {
   else if (m.type === "data") reading((m.svc === "plx" ? parsePlx : parseHr)(new DataView(new Uint8Array(m.bytes).buffer)));
 };
 
-async function camConnect() {
-  if (!HAS_CAM) return setStatus("camera_none");
-  stopSource();
-  setStatus("camera_start");
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: false,
-      video: { facingMode: "environment", width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } } });
-  } catch { return setStatus("camera_denied"); }
-  const track = stream.getVideoTracks()[0];
-  try { await track.applyConstraints({ advanced: [{ torch: true }] }); } catch {}  // the flashlight, where allowed
-  const video = Object.assign(document.createElement("video"), { muted: true, playsInline: true, srcObject: stream });
-  video.setAttribute("playsinline", "");
-  // iOS only decodes a video that is on the page: keep it there, tiny and invisible
-  video.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none";
-  document.body.append(video);
-  try { await video.play(); } catch {}
-  const cv = document.createElement("canvas"); cv.width = 24; cv.height = 18;
-  const ctx = cv.getContext("2d", { willReadFrequently: true });
-  const s = src = { kind: "camera", name: "camera", last: now(), gone: false, live: () => true,
-    stop() { this.gone = true; stream.getTracks().forEach(t => t.stop()); video.remove(); } };
-
-  const raw = [], sm = [], beats = [];  // {t, v}: the darkness of the finger; the smoothed pulse; beat times
-  let finger = 0, missing = 0, lastSm = null, prevSm = null, state = "";
-  const status = st => { if (st !== state) { state = st; setStatus(st, s.name); } };
-  const frame = (t) => {  // t: seconds
-    ctx.drawImage(video, 0, 0, cv.width, cv.height);
-    const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
-    let r = 0, g = 0, b = 0;
-    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-    const n = d.length / 4; r /= n; g /= n; b /= n;
-    if (!(r > 35 && r > 1.6 * g && r > 1.6 * b)) {  // no finger: the picture isn't a lit, red fingertip
-      if (++missing > 20) { finger = 0; raw.length = sm.length = beats.length = 0; lastSm = prevSm = null; status("camera_finger"); }
-      return;
-    }
-    missing = 0;
-    if (!finger) finger = t;
-    raw.push({ t, v: -r });
-    while (raw[0].t < t - 1.2) raw.shift();
-    // detrend over ~1 s (drops the slow drift of pressure and light), then smooth over ~0.1 s
-    const base = raw.reduce((a, p) => a + p.v, 0) / raw.length;
-    sm.push({ t, v: -r - base });
-    while (sm[0].t < t - 2.5) sm.shift();
-    const k = sm.slice(-3), x = k.reduce((a, p) => a + p.v, 0) / k.length;
-    if (t - finger < 2.5) { status("camera_wait"); prevSm = lastSm; lastSm = { t, v: x }; return; }  // let it settle
-    const amp = Math.max(...sm.map(p => Math.abs(p.v)));
-    // a beat: the smoothed signal just peaked, high enough, not too soon after the last one
-    if (prevSm && lastSm && lastSm.v > prevSm.v && lastSm.v >= x && lastSm.v > .35 * amp) {
-      // place the peak between frames (a parabola through the three points), for steadier intervals
-      const den = prevSm.v - 2 * lastSm.v + x, off = den ? .5 * (prevSm.v - x) / den : 0;
-      const tp = lastSm.t + Math.max(-.5, Math.min(.5, off)) * (t - lastSm.t);
-      const ivs = beats.slice(1).map((b, i) => b - beats[i]).sort((a, b) => a - b), med = ivs[ivs.length >> 1];
-      const gap = tp - (beats.at(-1) ?? -9);
-      if (gap > Math.max(.33, med ? .6 * med : 0)) {
-        beats.push(tp);
-        if (beats.length > 9) beats.shift();
-        if (beats.length >= 2 && gap < 2) {
-          const ms = gap * 1000, okay = !med || Math.abs(gap - med) < .25 * med;
-          const all = beats.slice(1).map((b, i) => b - beats[i]).sort((a, b) => a - b);
-          if (okay && all.length >= 3) { status("connected"); reading({ bpm: Math.round(60 / all[all.length >> 1]), rr: [ms] }); }
-          else status("camera_wait");
-        }
-      }
-    }
-    prevSm = lastSm; lastSm = { t, v: x };
-  };
-  const loop = video.requestVideoFrameCallback
-    ? (_, meta) => { if (s.gone) return; frame(meta.mediaTime ?? performance.now() / 1000); video.requestVideoFrameCallback(loop); }
-    : () => { if (s.gone) return; frame(performance.now() / 1000); requestAnimationFrame(loop); };
-  video.requestVideoFrameCallback ? video.requestVideoFrameCallback(loop) : requestAnimationFrame(loop);
-  status("camera_finger");
-}
-
 // the welcome screen: its circle breathes the chosen rhythm
 function showWelcome() {
   document.body.classList.add("welcome");
@@ -2128,10 +2045,7 @@ function showWelcome() {
     $("wSensorNote").textContent = isIOS
       ? "On iPhone and iPad, open this page in the free Bluefy browser to connect a watch or strap"
       : "Not in this browser: use Chrome or Edge on Android, Windows or Mac";
-    $("wSensor").classList.remove("primary"); $("wCam").classList.add("primary");
   }
-  if (!HAS_CAM) { $("wCam").disabled = true; $("wCamNote").textContent = "No camera in this browser"; }
-  if (!isIOS && !/Android/.test(navigator.userAgent)) $("wCamNote").textContent = "No sensor needed: rest a fingertip on the webcam, in a well-lit room";
 }
 const hideWelcome = () => document.body.classList.remove("welcome");
 function welcomeConnect(how) {
@@ -2141,7 +2055,6 @@ function welcomeConnect(how) {
 }
 $("wSensor").onclick = () => welcomeConnect(btConnect);
 $("wAll").onclick = () => welcomeConnect(() => btConnect(true));
-$("wCam").onclick = () => welcomeConnect(camConnect);
 $("wJust").onclick = () => { pendingZen = false; hideWelcome(); setZen(true); };
 $("wDash").onclick = () => { pendingZen = false; hideWelcome(); };
 
@@ -2150,11 +2063,9 @@ if (WEB) {
   $("stopBtn").textContent = "Connect heart rate";
   $("stopBtn").title = "Pair a watch, chest strap, armband or pulse oximeter over Bluetooth";
   $("stopBtn").onclick = btConnect;
-  $("camBtn").style.display = "";
-  $("camBtn").onclick = camConnect;
   if (navigator.bluetooth) { $("allBtBtn").style.display = ""; $("allBtBtn").onclick = () => btConnect(true); }
   setStatus("web");
-  setInterval(() => { if (src && src.kind !== "camera" && src.live() && now() - src.last > 10) setStatus("no_data", src.name); }, 5000);
+  setInterval(() => { if (src?.live() && now() - src.last > 10) setStatus("no_data", src.name); }, 5000);
 }
 
 // ---- live stream from hr_monitor.py

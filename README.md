@@ -1,7 +1,7 @@
 # Meditation Pulse
 
-Respira con una guida, musica e immagini che si muovono con il respiro. E vedi anche il battito: con
-un orologio, una fascia cardio o un saturimetro Bluetooth, oppure con la fotocamera del telefono.
+Respira con una guida, musica e immagini che si muovono con il respiro. Se hai un orologio, una fascia
+cardio o un saturimetro Bluetooth, vedi anche il battito.
 
 **Apri:** https://mirizzi.github.io/meditation-pulse-web/
 
@@ -23,7 +23,6 @@ si apre come un'app, anche senza connessione.
 All'apertura hai due scelte:
 
 - **Connect your heart rate sensor:** colleghi l'orologio, la fascia o il saturimetro e la meditazione parte.
-- **Measure with the camera:** appoggi un dito sulla fotocamera e la meditazione parte appena trova il battito.
 - **Just meditate:** parte subito, senza misurare niente.
 
 La meditazione parte con il ritmo *Deep calm* (4-4-8-2, 3,3 respiri al minuto). Vedi solo il
@@ -38,21 +37,6 @@ Con la tastiera: 1–8 modalità · O opzioni · L aspetto (cinematografico, mac
 illustrato) · K guardiano · M musica · B respiro · Esc esci.
 
 ## Il battito (facoltativo)
-
-Ci sono tre modi.
-
-### Con la fotocamera (anche su iPhone, senza niente)
-
-Premi **Measure with the camera** all'apertura (o *Pulse by camera* nel dashboard) e permetti l'uso
-della fotocamera. Appoggia **leggermente** il polpastrello dell'indice sulla fotocamera posteriore,
-coprendo anche il flash, e resta fermo: a ogni battito il dito diventa un po' più scuro, e l'app conta
-i battiti. Dove il browser lo permette il flash si accende da solo; se no, stai in una stanza ben
-illuminata. Dopo qualche secondo compare il battito.
-
-Comodo così: telefono appoggiato sulla gamba, schermo verso l'alto, dito sotto. Il battito è affidabile;
-la variabilità (HRV) è meno precisa che con una fascia. Su un computer funziona con la webcam, ma peggio.
-
-### Con un sensore Bluetooth
 
 Premi **Connect your heart rate sensor** all'apertura (o *Connect heart rate* nel dashboard) e
 scegli il sensore. Se non compare nella lista, premi *Not in the list? Show every Bluetooth device*
@@ -78,7 +62,7 @@ Strava o a un tapis roulant, funziona anche qui.
   vívoactive, Instinct); molti Polar (Vantage, Grit X, Pacer, Ignite); COROS (Pace, Apex, Vertix);
   vari Amazfit, Huawei, Xiaomi Smart Band e Fitbit Charge 6, con nomi diversi per l'opzione.
 - **Saturimetri** da dito con Bluetooth che usano lo standard Pulse Oximeter.
-  Molti saturimetri economici usano un formato tutto loro e non funzionano: in quel caso usa la fotocamera.
+  Molti saturimetri economici usano un formato tutto loro e non funzionano.
 - **Apple Watch e Samsung Galaxy Watch** non trasmettono il battito da soli: serve un'app sull'orologio
   che lo trasmetta come sensore Bluetooth (cerca "heart rate broadcast" nell'App Store o nel Play
   Store). Poi si collegano come gli altri.
@@ -90,16 +74,15 @@ Tranne il Venu 3S, questi dispositivi non li ho provati.
 
 Con il battito collegato, **Download session** salva la sessione come file CSV: una riga per ogni
 lettura del battito, con ora, battiti al minuto, intervalli tra i battiti (ms), tecnica, fase e
-livello del respiro. Il file finisce nei Download. Funziona anche con la fotocamera; con *Just meditate*
-non ci sono letture da salvare.
+livello del respiro. Il file finisce nei Download. Con *Just meditate* non ci sono
+letture da salvare.
 
 La sessione si può scaricare finché la pagina è aperta, anche dopo *Stop session*; chiudendo la
 pagina si perde. Le opzioni e quello che impara *Find my rhythm* restano invece nel browser.
 
 ## Privacy
 
-Non c'è nessun account e nessun server: tutto resta nel tuo browser. Le immagini della fotocamera
-servono solo a contare i battiti, sul momento: non vengono salvate né inviate. Servono solo le librerie
+Non c'è nessun account e nessun server: tutto resta nel tuo browser. Servono solo le librerie
 Tone.js e three.js, scaricate da cdnjs e jsDelivr.
 
 Non è un dispositivo medico.
