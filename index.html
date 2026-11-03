@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script>window.MP_WEB = true;</script>
+<script>window.MP_WEB = true; window.MP_VERSION = "20261103162705";</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -2068,33 +2068,45 @@ if (WEB) {
   setInterval(() => { if (src?.live() && now() - src.last > 10) setStatus("no_data", src.name); }, 5000);
 }
 
-// ---- updates for the web app: a phone keeps an installed app open in the background for days, so the
-// page asks for a new version whenever it comes back to the screen (and every hour). The new service
-// worker takes over at once; the page then reloads itself if nothing is going on, or offers a button.
-if (WEB && "serviceWorker" in navigator) {
-  const hadWorker = !!navigator.serviceWorker.controller;  // the very first install isn't an update
+// ---- updates for the web app. A phone keeps an installed app open in the background for days and an
+// iPhone brings it back without reloading, so the page itself asks for version.json (web/build.sh writes
+// it next to the page, with the same stamp as MP_VERSION) whenever it comes back to the screen, and every
+// ten minutes. On a new version it reloads at once if nothing is going on; during a meditation, a session
+// or a sensor connection it offers a button, and reloads by itself at the next quiet moment.
+if (WEB && window.MP_VERSION) {
   let reg = null;
-  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { reg = r; }).catch(() => {});
-  const check = () => reg?.update().catch(() => {});
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
-  setInterval(check, 3600 * 1000);
+  if ("serviceWorker" in navigator)
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => { reg = r; }).catch(() => {});
   const busy = () => zen || !!session || !!src || !!saved;  // saved: a session still to download
-  let ready = false;
+  let fresh = null;  // the newer version on the server
+  const load = () => {
+    // a new address each time, so no cache (the browser's or an old service worker's) serves the old page;
+    // and only once per version, so a server that still sends the old page can't make it loop
+    try { if (sessionStorage.getItem("mp.reloadedFor") === fresh) return; sessionStorage.setItem("mp.reloadedFor", fresh); } catch {}
+    location.replace(location.pathname + "?v=" + fresh);
+  };
   const offer = () => {
-    if (!busy()) return location.reload();
+    if (!busy()) return load();
     if ($("updateBar")) return;
     const bar = Object.assign(document.createElement("button"), { id: "updateBar",
-      textContent: "A new version is ready · tap to reload", onclick: () => location.reload() });
-    bar.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:20;" +
-      "padding:10px 16px;border-radius:999px;background:var(--panel);border:1px solid var(--breath);color:var(--text);font-size:14px";
+      textContent: "A new version is ready · tap to update", onclick: load });
+    bar.style.cssText = "position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);" +
+      "z-index:20;padding:10px 16px;border-radius:999px;background:var(--panel);border:1px solid var(--breath);color:var(--text);font-size:14px";
     document.body.append(bar);
   };
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!hadWorker || ready) return;
-    ready = true; offer();
-  });
-  // reloads on its own at the next quiet moment: back on the welcome screen or the dashboard, no session
-  setInterval(() => { if (ready && !busy() && !document.hidden) location.reload(); }, 5000);
+  const check = async () => {
+    if (document.hidden) return;
+    reg?.update().catch(() => {});
+    try {
+      const v = (await (await fetch("version.json?t=" + Date.now(), { cache: "no-store" })).json()).version;
+      if (v && v !== window.MP_VERSION && !fresh) { fresh = String(v); offer(); }
+    } catch {}  // offline: try again later
+  };
+  for (const [el, ev] of [[document, "visibilitychange"], [window, "pageshow"], [window, "focus"], [window, "online"]])
+    el.addEventListener(ev, check);
+  setInterval(check, 600 * 1000);
+  setInterval(() => { if (fresh && !busy() && !document.hidden) load(); }, 5000);
+  check();
 }
 
 // ---- live stream from hr_monitor.py
